@@ -15,33 +15,35 @@ def is_dir(item, guess_by_extension=True):
     if guess_by_extension is True and file_pattern.match(item):
         return False
 
-    wd = ftp.pwd()  # current working directory
+    working_directory = ftp.pwd()  # current working directory
     try:
-        ftp.cwd('/')
         ftp.cwd(item)  # see if name represents a child-subdirectory
-        ftp.cwd(wd)    # It works! Go back. Continue DFS.
+        ftp.cwd(working_directory)    # It works! Go back. Continue DFS.
         return True
     except:
         return False
 
 
-def make_catalog(dir_path):
-    ftp.cwd('/')
-    ftp.cwd(dir_path)
-    print "cataloging directory: " + dir_path
+def make_catalog(directory):
+    working_directory = ftp.pwd()
+
+    ftp.cwd(directory)
+    print "cataloging directory: " + directory
 
     item_list = ftp.nlst()
 
     for item in item_list:
-        if is_dir(dir_path + item):
-            make_catalog(dir_path + item)
+        if is_dir(item):
+            make_catalog(directory + item)
         else:
-            item_path = dir_path + '/' + item
+            item_path = directory + '/' + item
             writer.writerow([
                 item,
-                dir_path,
+                directory,
                 item.split('.', 1)[1] if '.' in item else '',
                 ftp.size(item_path)
             ])
+
+    ftp.cwd(working_directory)
 
 make_catalog("/pub10/ushcn_snow/R_input/")
