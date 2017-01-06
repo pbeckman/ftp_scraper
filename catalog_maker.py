@@ -1,5 +1,6 @@
+import sys
 import re
-from ftplib import *
+from ftplib import FTP, error_perm
 import csv
 
 ftp = FTP("cdiac.ornl.gov")
@@ -11,7 +12,8 @@ catalog_writer.writerow(["filename", "path", "file type", "size (bytes)"])
 agg_writer = csv.writer(open("cdiac_aggregates.csv", "w"))
 agg_writer.writerow(["file extension", "number of files", "average size (bytes)"])
 
-agg_data = {}  # dictionary storing information that will populate the aggregate csv
+fail_writer = csv.writer(open("cdiac_uncatalogued.csv", "w"))
+fail_writer.writerow(["item name", "path"])
 
 file_pattern = re.compile("^.*\..{2,4}$")  # pattern used to distinguish files from directories
 
@@ -29,8 +31,11 @@ def is_dir(item, guess_by_extension=True):
         return False
 
 
-def make_catalog(directory):
+def write_catalog(directory):
+    agg_data = {}  # dictionary storing information that will populate the aggregate csv
+
     working_directory = ftp.pwd()
+    print "current directory: " + directory
 
     ftp.cwd(directory)
     print "cataloging directory: " + directory
@@ -38,32 +43,58 @@ def make_catalog(directory):
     item_list = ftp.nlst()
 
     for item in item_list:
+        sub_directory = (directory + '{}' + item).format('/' if directory[-1] != '/' else '')
         if is_dir(item):
-            make_catalog(directory + item)
+            new_agg = write_catalog(sub_directory)
+            add_agg(agg_data, new_agg)
         else:
-            file_extension = item.split('.', 1)[1] if '.' in item else "no extension"
-            size = ftp.size(directory + '/' + item)
-            catalog_writer.writerow([
-                item,
-                directory,
-                file_extension,
-                size
-            ])
             try:
-                agg_data[file_extension]["files"] += 1
-                agg_data[file_extension]["total_bytes"] += size
-            except KeyError:
-                agg_data[file_extension] = {"files": 1, "total_bytes": size}
+                print "cataloging item: " + item
+                extension = item.split('.', 1)[1] if '.' in item else "no extension"
+                size = ftp.size(sub_directory)
+                catalog_writer.writerow([
+                    item,
+                    directory,
+                    extension,
+                    size
+                ])
+                try:
+                    agg_data[extension]["files"] += 1
+                    agg_data[extension]["total_bytes"] += size
+                except KeyError:
+                    agg_data[extension] = {"files": 1, "total_bytes": size}
+            except error_perm:
+                fail_writer.writerow([item, directory])
 
     ftp.cwd(working_directory)
 
-make_catalog("/pub10/ushcn_snow/R_input/")
+    return agg_data
 
-for file_extension, extension_data in agg_data.iteritems():
-    agg_writer.writerow([
-        file_extension,
-        extension_data["files"],
-        extension_data["total_bytes"]/extension_data["files"]
-    ])
 
+def add_agg(parent_agg, new_agg):
+    for extension, extension_data in new_agg.iteritems():
+        try:
+            parent_agg[extension]["files"] += extension_data["files"]
+            parent_agg[extension]["total_bytes"] += extension_data["total_bytes"]
+        except KeyError:
+            parent_agg[extension] = {
+                "files": extension_data["files"],
+                "total_bytes": extension_data["total_bytes"]
+            }
+
+    return parent_agg
+
+
+def write_agg(data):
+    for extension, extension_data in data.iteritems():
+        agg_writer.writerow([
+           extension,
+           extension_data["files"],
+           extension_data["total_bytes"]/extension_data["files"]
+        ])
+
+
+if __name__ == "__main__":
+    # test: "/pub10/ushcn_snow/R_input/FL"
+    write_agg(write_catalog(sys.argv[1]))
 
