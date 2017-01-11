@@ -1,32 +1,21 @@
 import sys
 import re
-from ftplib import FTP, error_perm
+from ftplib import error_perm
 import csv
 
-# TODO: don't rely on global variables for csv writers and aggregate data
+from metadata_collector import collect_metadata
 
-ftp = FTP("cdiac.ornl.gov")
-ftp.login()
-
-catalog_writer = csv.writer(open("cdiac_catalog.csv", "w"))
-catalog_writer.writerow(["filename", "path", "file type", "size (bytes)"])
-
-agg_writer = csv.writer(open("cdiac_aggregates.csv", "w"))
-agg_writer.writerow(["file extension", "number of files", "average size (bytes)"])
-
-fail_writer = csv.writer(open("cdiac_uncatalogued.csv", "w"))
-fail_writer.writerow(["item name", "path"])
-
-# pattern used to distinguish files from directories
+# pattern used to distinguish files from directories - has '.' in 2nd, 3rd, or 4th to last character
 file_pattern = re.compile("^.*\..{2,4}$")
 
 
-def is_dir(item, guess_by_extension=True):
+def is_dir(ftp, item, guess_by_extension=True):
     """Determine if item is a directory.
 
+        :param ftp: (ftp.FTP) ftp handle
         :param item: (str) item name
         :param guess_by_extension: (bool)
-        whether to assume items with a '.' in characters -2, -3, or -4 are files
+        whether to assume items matching file_pattern are files
         this avoids the slower, more costly cwd command
         :returns: (bool) whether item is a directory"""
 
@@ -45,17 +34,22 @@ def is_dir(item, guess_by_extension=True):
         return False
 
 
-def write_catalog(directory):
+def write_catalog(ftp, directory, catalog_writer, failure_writer):
     """Catalogs the name, path, size, and type of each file, writing it with the
     `catalog_writer` specified above
 
+            :param ftp: (ftp.FTP) ftp handle
             :param directory: (str) item name
+            :param catalog_writer: (csv.writer) writer used to catalog all valid items in the directory
+            headers = "filename", "path", "file type", "size (bytes)"
+            :param failure_writer: (csv.writer) writer used to catalog all un-openable items in the directory
+            headers = "item name", "path"
             :returns: (dict) aggregate file number and size data for each file extension"""
-    # TODO: generalize this to take an output csv as a parameter?
 
     # dictionary storing information that will populate the aggregate csv
     agg_data = {}
 
+    # record current directory in order to later return to it
     working_directory = ftp.pwd()
 
     ftp.cwd(directory)
@@ -67,12 +61,13 @@ def write_catalog(directory):
     for item in item_list:
         # if the item is a directory, this will create the correct path to get to it
         sub_directory = (directory + '{}' + item).format('/' if directory[-1] != '/' else '')
-        if is_dir(item):
+        if is_dir(ftp, item):
             # recursively catalog subdirectory and get its aggregate data
-            new_agg = write_catalog(sub_directory)
+            new_agg = write_catalog(ftp, sub_directory, catalog_writer, failure_writer)
             # add subdirectory aggregate data to total aggregate data
-            add_agg(agg_data, new_agg)
+            combine_agg(agg_data, new_agg)
         else:
+            # some items are corrupt or strange and can't be read, so throw those into a "failure" csv
             try:
                 print "cataloging item: " + item
                 extension = item.split('.', 1)[1] if '.' in item else "no extension"
@@ -90,14 +85,15 @@ def write_catalog(directory):
                 except KeyError:
                     agg_data[extension] = {"files": 1, "total_bytes": size}
             except error_perm:
-                fail_writer.writerow([item, directory])
+                failure_writer.writerow([item, directory])
 
+    # pop back up to the original directory
     ftp.cwd(working_directory)
 
     return agg_data
 
 
-def add_agg(parent_agg, new_agg):
+def combine_agg(parent_agg, new_agg):
     """Combine subdirectory aggregate data with parent aggregate data.
 
             :param parent_agg: (dict) aggregate data from parent directory
@@ -119,21 +115,21 @@ def add_agg(parent_agg, new_agg):
     return parent_agg
 
 
-def write_agg(data):
+def write_agg(data, agg_writer):
     """Write the aggregate data with the `agg_writer` specified above.
 
-                :param data: (dict) aggregate data to write"""
-    # TODO: generalize this to take an output csv as a parameter?
+                :param data: (dict) aggregate data to write
+                :param agg_writer: (csv.writer) writer used to write aggregates
+                headers = "file extension", "number of files", "total size (bytes)", "average size (bytes)" """
 
     for extension, extension_data in data.iteritems():
         agg_writer.writerow([
-           extension,
-           extension_data["files"],
-           extension_data["total_bytes"]/extension_data["files"]
+            extension,
+            extension_data["files"],
+            extension_data["total_bytes"],
+            extension_data["total_bytes"] / extension_data["files"]
         ])
 
 
 if __name__ == "__main__":
-    # test: "/pub10/ushcn_snow/R_input/FL"
-    write_agg(write_catalog(sys.argv[1]))
-
+    pass
