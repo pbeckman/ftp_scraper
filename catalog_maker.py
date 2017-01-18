@@ -1,9 +1,5 @@
-import sys
 import re
 from ftplib import error_perm
-import csv
-
-from metadata_collector import collect_metadata
 
 # pattern used to distinguish files from directories - has '.' in 2nd, 3rd, or 4th to last character
 file_pattern = re.compile("^.*\..{2,4}$")
@@ -120,7 +116,7 @@ def write_agg(data, agg_writer):
 
                 :param data: (dict) aggregate data to write
                 :param agg_writer: (csv.writer) writer used to write aggregates
-                headers = "file extension", "number of files", "total size (bytes)", "average size (bytes)" """
+                headers = "file type", "number of files", "total size (bytes)", "average size (bytes)" """
 
     for extension, extension_data in data.iteritems():
         agg_writer.writerow([
