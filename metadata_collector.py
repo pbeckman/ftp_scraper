@@ -24,7 +24,7 @@ def get_metadata(file_name, path):
             "file": file_name,
             "path": path,
             "type": extension,
-            # "checksum": md5(file_handle.read())
+            "checksum": md5(file_handle.read()).hexdigest()
         }
 
         # go back to the beginning of the file for real processing,
@@ -204,6 +204,10 @@ def get_columnar_metadata(file_handle, extension):
 
 
 class SpaceDelimitedReader:
+    """Reader for space delimited files. Acts in the same way as the standard csv.reader
+
+    :param file_handle: (file) open file """
+
     def __init__(self, file_handle):
         self.fh = file_handle
         self.dialect = ""
