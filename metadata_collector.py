@@ -1,12 +1,13 @@
 import csv
 import json
 import numpy
+import os
 from netCDF4 import Dataset
 import ftplib
 from hashlib import md5
 
 
-# TODO: bounding box method for lat and lon lists, granularity of data
+# TODO: bounding box method for lat and lon lists, granularity of data?
 # TODO: add failure cases to determine if a file is columnar or not
 
 def get_metadata(file_name, path):
@@ -24,6 +25,7 @@ def get_metadata(file_name, path):
             "file": file_name,
             "path": path,
             "type": extension,
+            "size": os.stat(path + file_name).st_size,
             "checksum": md5(file_handle.read()).hexdigest()
         }
 
@@ -31,12 +33,17 @@ def get_metadata(file_name, path):
         # because the checksum put the cursor at the end
         file_handle.seek(0)
 
-        if extension in ["csv", "txt"]:
-            specific_metadata = get_columnar_metadata(file_handle, extension)
-        elif extension == "nc":
+        specific_metadata = {}
+
+        try:
+            if extension in ["csv", "txt"]:
+                specific_metadata = get_columnar_metadata(file_handle, extension)
+        except StandardError:
+            # not a columnar file
+            pass
+
+        if extension == "nc":
             specific_metadata = get_netcdf_metadata(file_name, path)
-        else:
-            specific_metadata = {}
 
         if specific_metadata != {}:
             metadata["metadata"] = specific_metadata
@@ -124,7 +131,7 @@ def get_columnar_metadata(file_handle, extension):
         :param extension: (str) file extension used to determine csv.reader parameters
         :returns: (dict) ascertained metadata"""
 
-    # TODO: determine if whitespace separation for non-csv is effective, and if comma and excel dialect are for csv
+    # TODO: determine if whitespace separation for non-csv, and comma separated excel dialect for csv are effective
 
     # choose csv.reader parameters based on file type - if not csv, try space-delimited
     if extension == "csv":
@@ -140,8 +147,18 @@ def get_columnar_metadata(file_handle, extension):
     # this shows that we are on the first row and should type check
     # to decide whether to use numeric or text aggregation
     first_value_row = True
+    # used to check if all rows are the same length, if not, this is not a valid columnar file
+    row_length = 0
+    first_row = True
 
     for row in reader:
+        # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
+        if not first_row and row_length != len(row):
+            raise StandardError
+        first_row = False
+        # update row length for next check
+        row_length = len(row)
+
         # if the row is a header row, add all its fields to the headers list
         if is_header_row(row):
             num_header_rows += 1
@@ -219,8 +236,9 @@ class SpaceDelimitedReader:
         if line == "":
             raise StopIteration
         for field in line.split(" "):
-            if field.strip() != "":
-                fields.append(field.strip())
+            stripped_field = field.strip()
+            if stripped_field != "":
+                fields.append(stripped_field)
         self.line_num += 1
         return fields
 

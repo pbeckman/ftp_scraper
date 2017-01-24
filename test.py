@@ -21,31 +21,17 @@ failure_writer.writerow(["item name", "path"])
 #     write_catalog(ftp, "/pub2/ndp026c/", catalog_writer, failure_writer),
 #     agg_writer)
 
-# # test collecting metadata
-print """
-----------------------------
-some_netcdf.nc
-----------------------------
-"""
-print json.dumps(get_metadata("some_netcdf.nc", "test_files/"), sort_keys=True, indent=4, separators=(',', ': '))
+def display_metadata(file_name, path):
+    print """
+    ----------------------------
+    %s
+    ----------------------------
+    """.format(path + file_name)
+    print json.dumps(get_metadata(file_name, path), sort_keys=True, indent=4, separators=(',', ': '))
 
-print """
-----------------------------
-single_header.csv
-----------------------------
-"""
-print json.dumps(get_metadata("single_header.csv", "test_files/"), sort_keys=True, indent=4, separators=(',', ': '))
-
-print """
-----------------------------
-multiple_headers.csv
-----------------------------
-"""
-print json.dumps(get_metadata("multiple_headers.csv", "test_files/"), sort_keys=True, indent=4, separators=(',', ': '))
-
-print """
-----------------------------
-single_header.txt
-----------------------------
-"""
-print json.dumps(get_metadata("single_header.txt", "test_files/"), sort_keys=True, indent=4, separators=(',', ': '))
+# # test metadata collection
+display_metadata("some_netcdf.nc", "test_files/")
+display_metadata("single_header.csv", "test_files/")
+display_metadata("readme.txt", "test_files/")
+display_metadata("multiple_headers.csv", "test_files/")
+display_metadata("single_header.txt", "test_files/")
