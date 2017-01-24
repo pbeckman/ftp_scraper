@@ -24,7 +24,7 @@ failure_writer.writerow(["item name", "path"])
 def display_metadata(file_name, path):
     print """
     ----------------------------
-    %s
+    {}
     ----------------------------
     """.format(path + file_name)
     print json.dumps(get_metadata(file_name, path), sort_keys=True, indent=4, separators=(',', ': '))
