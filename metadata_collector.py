@@ -93,7 +93,11 @@ def write_metadata(ftp, metadata_file, directory):
                     if specific_metadata != {}:
                         metadata["metadata"] = specific_metadata
                         with_metadata = True
-                metadata_file.write(json.dumps(metadata))
+                # TODO: figure out what breaks this
+                try:
+                    metadata_file.write(json.dumps(metadata))
+                except:
+                    pass
                 # add data from this file to total stats
                 stats["total_bytes"] += size
                 stats["total_files"] += 1
