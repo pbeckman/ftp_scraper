@@ -39,8 +39,14 @@ def display_metadata(file_name, path):
 # display_metadata("multiple_headers.csv", "test_files/")
 # display_metadata("single_header.txt", "test_files/")
 
-# file for all JSON metadata
-with open("metadata.json", "w") as metadata_file:
-    with open("stats.txt", "w") as stats_file:
-        stats_file.write(write_metadata(ftp, metadata_file, "/pub8/"))
-
+with open("stats.txt", "w") as stats_file:
+    print "collecting metadata from /pub/"
+    with open("metadata1.json", "w") as metadata_file:
+        stats_file.write("pub: \n" + str(write_metadata(ftp, metadata_file, "/pub/")) + "\n\n")
+    for i in range(2, 13):
+        pub = "pub{}".format(i)
+        print "collecting metadata from /{}/".format(pub)
+        with open("metadata{}.json".format(i), "w") as metadata_file:
+            stats_file.write("{}: \n".format(pub) +
+                             str(write_metadata(ftp, metadata_file, "/{}/".format(pub))) +
+                             "\n\n")
