@@ -9,6 +9,8 @@ from metadata_util import get_metadata
 # pattern used to distinguish files from directories - has '.' in 2nd, 3rd, or 4th to last character
 file_pattern = compile("^.*\..{2,4}$")
 
+# TODO: restart point
+
 
 def is_dir(ftp, item, guess_by_extension=True):
     """Determine if FTP item is a directory.
@@ -59,7 +61,7 @@ def write_metadata(ftp, metadata_file, directory):
     working_directory = ftp.pwd()
 
     ftp.cwd(directory)
-    print "collecting metadata from directory: " + directory
+    # print "collecting metadata from directory: " + directory
 
     # all items in current directory
     item_list = ftp.nlst()
@@ -70,11 +72,11 @@ def write_metadata(ftp, metadata_file, directory):
             new_stats = write_metadata(ftp, metadata_file, directory + item)
             # add subdirectory stats to total stats
             combine_stats(stats, new_stats)
-            print stats
+            # print stats
         else:
             # some items are corrupt or strange and can't be read, so skip them
             try:
-                print "collecting metadata from item: " + item
+                # print "collecting metadata from item: " + item
                 size = ftp.size(item)
                 extension = item.split('.', 1)[1] if '.' in item else "no extension"
                 metadata = {
