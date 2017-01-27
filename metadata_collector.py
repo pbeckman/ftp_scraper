@@ -86,13 +86,17 @@ def write_metadata(ftp, metadata_file, directory):
                 # TODO: add decompression step
                 with_metadata = False
                 if extension in ["csv", "txt", "nc"]:
-                    with open("download/{}".format(item), 'wb') as f:
-                        ftp.retrbinary('RETR {}'.format(item), f.write)
-                    specific_metadata = get_metadata(item, "download/")
-                    os.remove("download/{}".format(item))
-                    if specific_metadata != {}:
-                        metadata["metadata"] = specific_metadata
-                        with_metadata = True
+                    # TODO: where to put try excepts...
+                    try:
+                        with open("download/{}".format(item), 'wb') as f:
+                            ftp.retrbinary('RETR {}'.format(item), f.write)
+                        specific_metadata = get_metadata(item, "download/")
+                        os.remove("download/{}".format(item))
+                        if specific_metadata != {}:
+                            metadata["metadata"] = specific_metadata
+                            with_metadata = True
+                    except:
+                        pass
                 # TODO: figure out what breaks this
                 try:
                     metadata_file.write(json.dumps(metadata))
