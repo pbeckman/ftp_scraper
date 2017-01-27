@@ -1,272 +1,121 @@
-import csv
-import json
-import numpy
 import os
-from netCDF4 import Dataset
-import ftplib
-from hashlib import md5
+import json
+import tarfile
+from re import compile
+from zipfile import ZipFile
+from ftplib import error_perm
+from metadata_util import get_metadata
+
+# pattern used to distinguish files from directories - has '.' in 2nd, 3rd, or 4th to last character
+file_pattern = compile("^.*\..{2,4}$")
 
 
-# TODO: bounding box method for lat and lon lists, granularity of data?
-# TODO: add failure cases to determine if a file is columnar or not
+def is_dir(ftp, item, guess_by_extension=True):
+    """Determine if FTP item is a directory.
 
-def get_metadata(file_name, path):
-    """Create metadata JSON from file.
+        :param ftp: (ftp.FTP) ftp handle
+        :param item: (str) item name
+        :param guess_by_extension: (bool)
+        whether to assume items matching file_pattern are files
+        this avoids the slower, more costly cwd command
+        :returns: (bool) whether item is a directory"""
 
-        :param file_name: (str) file name
-        :param path: (str) path to file
-        :returns: (dict) metadata dictionary"""
-
-    with open(path + file_name, 'rU') as file_handle:
-
-        extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
-
-        metadata = {
-            "file": file_name,
-            "path": path,
-            "type": extension,
-            "size": os.stat(path + file_name).st_size,
-            "checksum": md5(file_handle.read()).hexdigest()
-        }
-
-        # go back to the beginning of the file for real processing,
-        # because the checksum put the cursor at the end
-        file_handle.seek(0)
-
-        specific_metadata = {}
-
-        try:
-            if extension in ["csv", "txt"]:
-                specific_metadata = get_columnar_metadata(file_handle, extension)
-        except StandardError:
-            # not a columnar file
-            pass
-
-        if extension == "nc":
-            specific_metadata = get_netcdf_metadata(file_name, path)
-
-        if specific_metadata != {}:
-            metadata["metadata"] = specific_metadata
-
-    return metadata
-
-
-class NumpyDecoder(json.JSONEncoder):
-    """Serializer used to convert numpy dtypes to normal json serializable types.
-    Since netCDF4 produces numpy types, this is necessary for compatibility with
-    other metadata scrapers like the csv, which returns a python dict"""
-
-    def default(self, obj):
-        if isinstance(obj, numpy.generic):
-            return numpy.asscalar(obj)
-        elif isinstance(obj, numpy.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, numpy.dtype):
-            return str(obj)
-        else:
-            return super(NumpyDecoder, self).default(obj)
-
-
-def get_netcdf_metadata(file_name, path):
-    """Create netcdf metadata JSON from file.
-
-        :param file_name: (str) file name
-        :param path: (str) path to file
-        :returns: (dict) metadata dictionary"""
-
-    dataset = Dataset(path + file_name)
-    metadata = {
-        "file_format": dataset.file_format,
-    }
-    if len(dataset.ncattrs()) > 0:
-        metadata["global_attributes"] = {}
-    for attr in dataset.ncattrs():
-        metadata["global_attributes"][attr] = dataset.getncattr(attr)
-
-    dims = dataset.dimensions
-    if len(dims) > 0:
-        metadata["dimensions"] = {}
-    for dim in dims:
-        metadata["dimensions"][dim] = {
-            "size": len(dataset.dimensions[dim])
-        }
-        add_ncattr_metadata(dataset, dim, "dimensions", metadata)
-
-    vars = dataset.variables
-    if len(vars) > 0:
-        metadata["variables"] = {}
-    for var in vars:
-        if var not in dims:
-            metadata["variables"][var] = {
-                "dimensions": dataset.variables[var].dimensions,
-                "size": dataset.variables[var].size
-            }
-        add_ncattr_metadata(dataset, var, "variables", metadata)
-
-    # cast all numpy types to native python types via dumps, then back to dict via loads
-    return json.loads(json.dumps(metadata, cls=NumpyDecoder))
-
-
-def add_ncattr_metadata(dataset, name, dim_or_var, metadata):
-    """Get attributes from a netCDF variable or dimension.
-
-        :param dataset: (netCDF4.Dataset) dataset from which to extract metadata
-        :param name: (str) name of attribute
-        :param dim_or_var: ("dimensions" | "variables") metadata key for attribute info
-        :param metadata: (dict) dictionary to add this attribute info to"""
-
-    try:
-        metadata[dim_or_var][name]["type"] = dataset.variables[name].dtype
-        for attr in dataset.variables[name].ncattrs():
-            metadata[dim_or_var][name][attr] = dataset.variables[name].getncattr(attr)
-    # some variables have no attributes
-    except KeyError:
-        pass
-
-
-def get_columnar_metadata(file_handle, extension):
-    """Get all header fields from file, return None if none can be retrieved.
-
-        :param file_handle: (file) open file
-        :param extension: (str) file extension used to determine csv.reader parameters
-        :returns: (dict) ascertained metadata"""
-
-    # TODO: determine if whitespace separation for non-csv, and comma separated excel dialect for csv are effective
-
-    # choose csv.reader parameters based on file type - if not csv, try space-delimited
-    if extension == "csv":
-        reader = csv.reader(file_handle, skipinitialspace=True)
-    else:
-        reader = SpaceDelimitedReader(file_handle)
-
-    headers = []
-    header_types = []
-    metadata = {}
-    num_value_rows = 0
-    num_header_rows = 0
-    # this shows that we are on the first row and should type check
-    # to decide whether to use numeric or text aggregation
-    first_value_row = True
-    # used to check if all rows are the same length, if not, this is not a valid columnar file
-    row_length = 0
-    first_row = True
-
-    for row in reader:
-        # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
-        if not first_row and row_length != len(row):
-            raise StandardError
-        first_row = False
-        # update row length for next check
-        row_length = len(row)
-
-        # if the row is a header row, add all its fields to the headers list
-        if is_header_row(row):
-            num_header_rows += 1
-            for header in row:
-                if header != "":
-                    headers.append(header)
-
-        # don't return column aggregate data for files with multiple header rows
-        elif num_header_rows == 1:
-            # type check the first row to decide which aggregates to use
-            if first_value_row:
-                header_types = ["num" if is_number(field) else "str" for field in row]
-
-            # add row data to aggregates
-            for i in range(0, len(row)):
-                num_value_rows += 1
-                value = row[i]
-                header = headers[i]
-                header_type = header_types[i]
-
-                if header_type == "num":
-                    # cast the field to a number to do numerical aggregates
-                    value = float(value)
-
-                    # start of the metadata if this is the first row of values
-                    if first_value_row:
-                        metadata[header] = {
-                            "min": value,
-                            "max": value,
-                            "total": value,
-                        }
-
-                    # add row data to existing aggregates
-                    else:
-                        if value < metadata[header]["min"]:
-                            metadata[header]["min"] = value
-                        if value > metadata[header]["max"]:
-                            metadata[header]["max"] = value
-                        metadata[header]["total"] += value
-
-                elif header_type == "str":
-                    # TODO: add string field aggregates?
-                    pass
-
-            first_value_row = False
-
-    # add header list to metadata
-    if len(headers) > 0:
-        metadata["headers"] = headers
-    # calculate averages for numerical columns if aggregates were taken,
-    # (which only happends when there is a single row of headers)
-    if num_header_rows == 1:
-        for i in range(0, len(headers)):
-            if header_types[i] == "num":
-                header = headers[i]
-                metadata[header]["avg"] = metadata[header]["total"] / num_value_rows
-                metadata[header].pop("total")
-
-    return metadata
-
-
-class SpaceDelimitedReader:
-    """Reader for space delimited files. Acts in the same way as the standard csv.reader
-
-    :param file_handle: (file) open file """
-
-    def __init__(self, file_handle):
-        self.fh = file_handle
-        self.dialect = ""
-        self.line_num = 0
-
-    def next(self):
-        fields = []
-        line = self.fh.readline()
-        if line == "":
-            raise StopIteration
-        for field in line.split(" "):
-            stripped_field = field.strip()
-            if stripped_field != "":
-                fields.append(stripped_field)
-        self.line_num += 1
-        return fields
-
-    def __iter__(self):
-        return self
-
-
-def is_header_row(row):
-    """Determine if row is a header row by checking if it contains any fields that are
-    only numeric.
-
-        :param row: (list(str)) list of fields in row
-        :returns: (bool) whether row is a header row"""
-
-    for field in row:
-        if is_number(field):
-            return False
-    return True
-
-
-def is_number(field):
-    """Determine if a string is a number by attempting to cast to it a float.
-
-        :param field: (str) field
-        :returns: (bool) whether field can be cast to a number"""
-
-    try:
-        float(field)
-        return True
-    except ValueError:
+    if guess_by_extension is True and file_pattern.match(item):
         return False
+
+    # current working directory
+    working_directory = ftp.pwd()
+
+    try:
+        # see if item is a directory - directory change will fail if it is a file
+        ftp.cwd(item)
+        ftp.cwd(working_directory)
+        return True
+    except error_perm:
+        return False
+
+
+def write_metadata(ftp, metadata_file, directory):
+    """Catalogs the name, path, size, and type of each file, writing it with the
+    given catalog_writer if possible, and with the failure_writer if un-openable.
+
+            :param ftp: (ftp.FTP) ftp handle
+            :param metadata_file: (files) JSON file for metadata
+            :param directory: (str) directory name
+            :returns: (dict) aggregate file number and size data for each file extension"""
+
+    # dictionary storing information that will populate the aggregate csv
+    stats = {
+        "total_bytes": 0,
+        "total_bytes_with_metadata": 0,
+        "total_files": 0,
+        "total_files_with_metadata": 0
+    }
+
+    # corrects the path of the directory with '/' if necessary
+    directory = (directory + '{}').format('/' if directory[-1] != '/' else '')
+
+    # record current directory in order to later return to it
+    working_directory = ftp.pwd()
+
+    ftp.cwd(directory)
+    print "collecting metadata from directory: " + directory
+
+    # all items in current directory
+    item_list = ftp.nlst()
+
+    for item in item_list:
+        if is_dir(ftp, item):
+            # recursively catalog subdirectory and get its metadata stats
+            new_stats = write_metadata(ftp, metadata_file, directory + item)
+            # add subdirectory stats to total stats
+            combine_stats(stats, new_stats)
+            print stats
+        else:
+            # some items are corrupt or strange and can't be read, so skip them
+            try:
+                print "collecting metadata from item: " + item
+                size = ftp.size(item)
+                extension = item.split('.', 1)[1] if '.' in item else "no extension"
+                metadata = {
+                    "file": item,
+                    "path": directory,
+                    "type": extension,
+                    "size": size
+                }
+                # TODO: add decompression step
+                with_metadata = False
+                if extension in ["csv", "txt", "nc"]:
+                    with open("download/{}".format(item), 'wb') as f:
+                        ftp.retrbinary('RETR {}'.format(item), f.write)
+                    specific_metadata = get_metadata(item, "download/")
+                    os.remove("download/{}".format(item))
+                    if specific_metadata != {}:
+                        metadata["metadata"] = specific_metadata
+                        with_metadata = True
+                metadata_file.write(json.dumps(metadata))
+                # add data from this file to total stats
+                stats["total_bytes"] += size
+                stats["total_files"] += 1
+                if with_metadata:
+                    stats["total_bytes_with_metadata"] += size
+                    stats["total_files_with_metadata"] += 1
+            except error_perm:
+                pass
+
+    # pop back up to the original directory
+    ftp.cwd(working_directory)
+
+    return stats
+
+
+def combine_stats(stats, new_stats):
+    for key in stats.keys():
+        stats[key] += new_stats[key]
+
+# zip = ZipFile("test_files/compressed.zip")
+# contents = zip.namelist()
+#
+# zip.extractall("test_files/compressed")
+# for item in contents:
+#     if os.path.isdir():
