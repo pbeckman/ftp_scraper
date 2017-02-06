@@ -6,7 +6,7 @@ from decimal import Decimal
 
 
 # TODO: bounding box method for lat and lon lists?
-# TODO: round aggregates, granularity of data?
+# TODO: granularity of data?
 
 def get_metadata(file_name, path):
     """Create metadata JSON from file.
@@ -22,7 +22,7 @@ def get_metadata(file_name, path):
         metadata = {}
 
         try:
-            if extension in ["csv", "txt"]:
+            if extension != "nc":  # if extension in ["csv", "txt"]:
                 metadata = get_columnar_metadata(file_handle, extension)
         except StandardError:
             # not a columnar file
@@ -32,22 +32,6 @@ def get_metadata(file_name, path):
             metadata = get_netcdf_metadata(file_name, path)
 
     return metadata
-
-
-class NumpyDecoder(json.JSONEncoder):
-    """Serializer used to convert numpy dtypes to normal json serializable types.
-    Since netCDF4 produces numpy types, this is necessary for compatibility with
-    other metadata scrapers like the csv, which returns a python dict"""
-
-    def default(self, obj):
-        if isinstance(obj, numpy.generic):
-            return numpy.asscalar(obj)
-        elif isinstance(obj, numpy.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, numpy.dtype):
-            return str(obj)
-        else:
-            return super(NumpyDecoder, self).default(obj)
 
 
 def get_netcdf_metadata(file_name, path):
@@ -105,6 +89,22 @@ def add_ncattr_metadata(dataset, name, dim_or_var, metadata):
     # some variables have no attributes
     except KeyError:
         pass
+
+
+class NumpyDecoder(json.JSONEncoder):
+    """Serializer used to convert numpy types to normal json serializable types.
+    Since netCDF4 produces numpy types, this is necessary for compatibility with
+    other metadata scrapers like the csv, which returns a python dict"""
+
+    def default(self, obj):
+        if isinstance(obj, numpy.generic):
+            return numpy.asscalar(obj)
+        elif isinstance(obj, numpy.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, numpy.dtype):
+            return str(obj)
+        else:
+            return super(NumpyDecoder, self).default(obj)
 
 
 def get_columnar_metadata(file_handle, extension):
@@ -213,10 +213,10 @@ def add_row_to_aggregates(metadata, row, headers, header_types, is_first_num_row
 def add_avg_to_aggregates(metadata, headers, header_types, num_value_rows):
     """Adds row data to aggregates.
 
-            :param metadata: (dict) metadata dictionary to add to
-            :param headers: (list(str)) list of headers
-            :param header_types: (list("num" | "str")) list of header types
-            :param num_value_rows: (int) number of value rows"""
+        :param metadata: (dict) metadata dictionary to add to
+        :param headers: (list(str)) list of headers
+        :param header_types: (list("num" | "str")) list of header types
+        :param num_value_rows: (int) number of value rows"""
 
     # calculate averages for numerical columns if aggregates were taken,
     # (which only happens when there is a single row of headers)
@@ -231,13 +231,17 @@ def add_avg_to_aggregates(metadata, headers, header_types, num_value_rows):
 
 
 def max_precision(nums):
+    """Determine the maximum precision of a list of floating point numbers.
+
+        :param nums: (list(float)) list of numbers
+        :return: (int) number of decimal places precision"""
     return max([abs(Decimal(str(num)).as_tuple().exponent) for num in nums])
 
 
 class SpaceDelimitedReader:
     """Reader for space delimited files. Acts in the same way as the standard csv.reader
 
-    :param file_handle: (file) open file """
+        :param file_handle: (file) open file """
 
     def __init__(self, file_handle):
         self.fh = file_handle
