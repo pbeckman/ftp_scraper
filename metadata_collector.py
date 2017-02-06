@@ -108,16 +108,16 @@ def write_metadata(ftp, metadata_file, directory):
                             metadata_file.write(json.dumps(metadata) + ",")
                         except Exception as e:
                             with open("errors.txt", "w") as error_file:
-                                error_file.write(directory + item + ":(a) error = " + e + "\n")
+                                error_file.write(directory + item + ":(a) error = " + str(e) + "\n")
 
                     os.remove(local_path_to_item)
                 except Exception as e:
                     with open("errors.txt", "w") as error_file:
-                        error_file.write(directory + item + ":(b) error = " + e + "\n")
+                        error_file.write(directory + item + ":(b) error = " + str(e) + "\n")
 
             except Exception as e:  # error_perm if size cannot be read
                 with open("errors.txt", "w") as error_file:
-                    error_file.write(directory + item + ":(c) error = " + e + "\n")
+                    error_file.write(directory + item + ":(c) error = " + str(e) + "\n")
                 pass
 
     # pop back up to the original directory
