@@ -54,13 +54,13 @@ def get_globus_client():
     return tc
 
 
-def write_file_list(tc, endpoint_id, path, list_file):
+def write_file_list(tc, endpoint_id, globus_path, list_file):
     # corrects the path with '/' if necessary
-    path = (path + '{}').format('/' if path[-1] != '/' else '')
+    globus_path = (globus_path + '{}').format('/' if globus_path[-1] != '/' else '')
 
-    list = tc.operation_ls(endpoint_id, path=path)
+    list = tc.operation_ls(endpoint_id, path=globus_path)
     for item in list:
-        item_path = path + item["name"]
+        item_path = globus_path + item["name"]
         if item["type"] == "dir":
             write_file_list(tc, endpoint_id, item_path, list_file)
         elif item["type"] == "file":
@@ -73,7 +73,7 @@ def download_file(tc, endpoint_id, globus_path, file_name):
 
     result = tc.submit_transfer(tdata)
 
-    while not tc.task_wait(result["task_id"], polling_interval=1):
+    while not tc.task_wait(result["task_id"], polling_interval=1, timeout=60):
         print("waiting for download: {}".format(globus_path + file_name))
 
 
@@ -92,6 +92,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
     for file_number in range(start_file_number, len(files)):
         full_file_name = files[file_number]
         globus_path, file_name = full_file_name.rsplit("/", 1)
+        globus_path += "/"
 
         extension = file_name.split('.', 1)[1].strip() if '.' in file_name else "no extension"
         # for null value collection only process these 3 types
