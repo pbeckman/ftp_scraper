@@ -74,21 +74,20 @@ def download_file(tc, endpoint_id, globus_path, file_name):
     result = tc.submit_transfer(tdata)
 
     while not tc.task_wait(result["task_id"], polling_interval=1):
-        print("waiting for file {} to download".format(file_name))
-
-    print("download complete")
-    print(result.data)
+        pass
 
 
 def delete_file(tc, endpoint_id, path_to_endpoint, file_name):
     ddata = globus_sdk.DeleteData(tc, endpoint_id)
 
+    print(path_to_endpoint + file_name)
     ddata.add_item(path_to_endpoint + file_name)
 
     # # Ensure endpoint is activated
     # tc.endpoint_autoactivate(endpoint_id)
 
     result = tc.submit_delete(ddata)
+    print(result.data)
 
 
 def write_metadata(tc, endpoint_id, files, start_file_number, path_to_endpoint, metadata_file, restart_file):
