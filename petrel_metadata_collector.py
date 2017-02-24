@@ -103,8 +103,8 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
             if "content_metadata" in metadata.keys():
                 metadata_file.write(json.dumps(metadata) + ",")
 
-        restart_file.truncate()
-        restart_file.write("{},{}".format(file_number, full_file_name))
+        # restart_file.truncate()
+        restart_file.write("{},{}\n".format(file_number, full_file_name))
 
 
 def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
@@ -136,6 +136,9 @@ tc = get_globus_client()
 # activate Petrel endpoint
 tc.endpoint_autoactivate(PETREL_ID)
 
+# activate local endpoint
+tc.endpoint_autoactivate(LOCAL_ID)
+
 # with open("pub8_list.txt", "w") as f:
 #     write_file_list(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/", f)
 
@@ -149,3 +152,4 @@ with open("pub8_list.txt", "r") as file_list:
             metadata_file.write("{data:[")
             write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", metadata_file, restart_file)
             metadata_file.write("]}")
+
