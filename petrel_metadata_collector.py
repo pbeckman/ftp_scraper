@@ -11,13 +11,14 @@ file_pattern = compile("^.*\..{2,4}$")
 
 PETREL_ID = os.environ["PETREL_ID"]
 LOCAL_ID = os.environ["LOCAL_ID"]
+TRANSFER_TOKEN = os.environ["TRANSFER_TOKEN"]
 
 # create a client object that tracks state as we do this flow
-client = globus_sdk.NativeAppAuthClient(LOCAL_ID)
+client = None  # globus_sdk.NativeAppAuthClient(LOCAL_ID)
 
 
 def globus_first_login():
-    # This method should only have to be run once EVER per user to get environment variables
+    # This method should only have to be run once EVER per user to get refresh token environment variable
 
     # explicitly start the flow (some clients may support multiple flows)
     client.oauth2_start_flow_native_app()  # refresh_tokens=True
@@ -48,9 +49,11 @@ def globus_first_login():
 
 
 def get_globus_client():
-    authorizer = globus_sdk.RefreshTokenAuthorizer(
-        os.environ["REFRESH_TOKEN"],
-        client)
+    # authorizer = globus_sdk.RefreshTokenAuthorizer(
+    #     os.environ["REFRESH_TOKEN"],
+    #     client)
+
+    authorizer = globus_sdk.AccessTokenAuthorizer(TRANSFER_TOKEN)
 
     # and try using `tc` to make TransferClient calls. Everything should just
     # work -- for days and days, months and months, even years
@@ -138,7 +141,7 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
 
 
 # get client
-tc = globus_first_login()
+tc = get_globus_client()
 
 # # activate Petrel endpoint
 # tc.endpoint_autoactivate(PETREL_ID)
