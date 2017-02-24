@@ -110,10 +110,12 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
             metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
             print(metadata)
             # write metadata to file if there are aggregates
-            if "content_metadata" in metadata.keys():
-                metadata_file.write(json.dumps(metadata) + ",")
+            try:
+                if "content_metadata" in metadata.keys():
+                    metadata_file.write(json.dumps(metadata) + ",")
+            except:
+                pass
 
-        # restart_file.truncate()
         restart_file.write("{},{}\n".format(file_number, full_file_name))
 
 
