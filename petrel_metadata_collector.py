@@ -105,7 +105,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
             if "content_metadata" in metadata.keys():
                 metadata_file.write(json.dumps(metadata) + ",")
 
-        restart_file.truncate(0)
+        restart_file.truncate()
         restart_file.write("{},{}".format(file_number, full_file_name))
 
 
