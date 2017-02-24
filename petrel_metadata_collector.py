@@ -67,9 +67,9 @@ def write_file_list(tc, endpoint_id, path, list_file):
             list_file.write(item_path + '\n')
 
 
-def download_file(tc, endpoint_id, path, file_name):
+def download_file(tc, endpoint_id, globus_path, file_name):
     tdata = globus_sdk.TransferData(tc, endpoint_id, LOCAL_ID)
-    tdata.add_item(path + file_name, "/home/paul/" + file_name)
+    tdata.add_item(globus_path + file_name, "/home/paul/" + file_name)
 
     result = tc.submit_transfer(tdata)
 
@@ -78,6 +78,17 @@ def download_file(tc, endpoint_id, path, file_name):
 
     print("download complete")
     print(result.data)
+
+
+def delete_file(tc, endpoint_id, path_to_endpoint, file_name):
+    ddata = globus_sdk.DeleteData(tc, endpoint_id)
+
+    ddata.add_item(path_to_endpoint + file_name)
+
+    # # Ensure endpoint is activated
+    # tc.endpoint_autoactivate(endpoint_id)
+
+    result = tc.submit_delete(ddata)
 
 
 def write_metadata(tc, endpoint_id, files, start_file_number, path_to_endpoint, metadata_file, restart_file):
@@ -112,9 +123,9 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, path_to_endpoint)
         "size": os.path.getsize(local_path_to_file)
     }
 
-    content_metadata = get_metadata(file_name, local_path_to_file)
+    content_metadata = get_metadata(file_name, path_to_endpoint)
 
-    os.remove(local_path_to_file)
+    delete_file(tc, endpoint_id, path_to_endpoint, file_name)
 
     if content_metadata != {}:
         metadata["content_metadata"] = content_metadata
@@ -131,5 +142,6 @@ tc.endpoint_autoactivate(PETREL_ID)
 # with open("pub8_list.txt", "w") as f:
 #     write_file_list(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/", f)
 
-download_file(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt")
+# download_file(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt")
 
+print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
