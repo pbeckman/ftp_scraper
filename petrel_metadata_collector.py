@@ -43,9 +43,7 @@ def globus_first_login():
 def get_globus_client():
     authorizer = globus_sdk.RefreshTokenAuthorizer(
         os.environ["REFRESH_TOKEN"],
-        client,
-        access_token=os.environ["ACCESS_TOKEN"],
-        expires_at=int(os.environ["EXPIRES_AT_SECONDS"]))
+        client)
 
     # and try using `tc` to make TransferClient calls. Everything should just
     # work -- for days and days, months and months, even years
