@@ -77,42 +77,39 @@ def download_file(tc, endpoint_id, globus_path, file_name):
         pass
 
 
-def delete_file(tc, path_to_endpoint, file_name):
+def delete_file(tc, local_path, file_name):
     ddata = globus_sdk.DeleteData(tc, LOCAL_ID)
 
-    print(path_to_endpoint + file_name)
-    ddata.add_item(path_to_endpoint + file_name)
+    ddata.add_item(local_path + file_name)
 
     # # Ensure endpoint is activated
     # tc.endpoint_autoactivate(endpoint_id)
 
     result = tc.submit_delete(ddata)
-    print(result.data)
 
 
-def write_metadata(tc, endpoint_id, files, start_file_number, path_to_endpoint, metadata_file, restart_file):
+def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metadata_file, restart_file):
     for file_number in range(start_file_number, len(files)):
         full_file_name = files[file_number]
+        print("collecting metadata from {}".format(full_file_name))
         globus_path, file_name = full_file_name.rsplit("/", 1)
 
         extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
-            metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, path_to_endpoint)
-            # write metadata to file
-            try:
+            metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
+            # write metadata to file if there are aggregates
+            if "content_metadata" in metadata.keys():
+                print(metadata)
                 metadata_file.write(json.dumps(metadata) + ",")
-            except Exception as e:
-                with open("errors.txt", "w") as error_file:
-                    error_file.write(full_file_name + ": error = " + str(e) + "\n")
 
         restart_file.truncate(0)
         restart_file.write("{},{}".format(file_number, full_file_name))
 
 
-def get_file_metadata(tc, endpoint_id, globus_path, file_name, path_to_endpoint):
+def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
     download_file(tc, endpoint_id, globus_path, file_name)
-    local_path_to_file = path_to_endpoint + file_name
+    local_path_to_file = local_path + file_name
 
     extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
     metadata = {
@@ -122,9 +119,9 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, path_to_endpoint)
         "size": os.path.getsize(local_path_to_file)
     }
 
-    content_metadata = get_metadata(file_name, path_to_endpoint)
+    content_metadata = get_metadata(file_name, local_path)
 
-    delete_file(tc, path_to_endpoint, file_name)
+    delete_file(tc, local_path, file_name)
 
     if content_metadata != {}:
         metadata["content_metadata"] = content_metadata
@@ -143,4 +140,11 @@ tc.endpoint_autoactivate(PETREL_ID)
 
 # download_file(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt")
 
-print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
+# print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
+
+with open("pub8_list.txt", "r") as file_list:
+    with open("metadata.json", "w") as metadata_file:
+        with open("restart.txt", "w") as restart_file:
+            metadata_file.write("{data:[")
+            write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", metadata_file, restart_file)
+            metadata_file.write("]}")
