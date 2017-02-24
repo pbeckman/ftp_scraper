@@ -93,7 +93,7 @@ def delete_file(tc, local_path, file_name):
 def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metadata_file, restart_file):
     for file_number in range(start_file_number, len(files)):
         full_file_name = files[file_number]
-        globus_path, file_name = full_file_name.rsplit("/", 1)
+        globus_path, file_name = full_file_name.strip().rsplit("/", 1)
         globus_path += "/"
 
         extension = file_name.split('.', 1)[1].strip() if '.' in file_name else "no extension"
