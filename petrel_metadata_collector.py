@@ -94,6 +94,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
         globus_path, file_name = full_file_name.rsplit("/", 1)
 
         extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
+        print("{} == {}".format(file_name, extension))
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
             print("collecting metadata from {}".format(full_file_name))
