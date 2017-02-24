@@ -77,8 +77,8 @@ def download_file(tc, endpoint_id, globus_path, file_name):
         pass
 
 
-def delete_file(tc, endpoint_id, path_to_endpoint, file_name):
-    ddata = globus_sdk.DeleteData(tc, endpoint_id)
+def delete_file(tc, path_to_endpoint, file_name):
+    ddata = globus_sdk.DeleteData(tc, LOCAL_ID)
 
     print(path_to_endpoint + file_name)
     ddata.add_item(path_to_endpoint + file_name)
@@ -124,7 +124,7 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, path_to_endpoint)
 
     content_metadata = get_metadata(file_name, path_to_endpoint)
 
-    delete_file(tc, endpoint_id, path_to_endpoint, file_name)
+    delete_file(tc, path_to_endpoint, file_name)
 
     if content_metadata != {}:
         metadata["content_metadata"] = content_metadata
