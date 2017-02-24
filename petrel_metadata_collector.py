@@ -20,7 +20,7 @@ def globus_first_login():
     # This method should only have to be run once EVER per user to get environment variables
 
     # explicitly start the flow (some clients may support multiple flows)
-    client.oauth2_start_flow_native_app(refresh_tokens=True)
+    client.oauth2_start_flow_native_app()  # refresh_tokens=True
     # print URL
     print("Login Here:\n{0}".format(client.oauth2_get_authorize_url()))
 
