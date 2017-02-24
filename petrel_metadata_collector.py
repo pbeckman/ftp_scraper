@@ -68,6 +68,7 @@ def write_file_list(tc, endpoint_id, globus_path, list_file):
 
 
 def download_file(tc, endpoint_id, globus_path, file_name):
+    print("downloading file {}".format(globus_path + file_name))
     tdata = globus_sdk.TransferData(tc, endpoint_id, LOCAL_ID)
     tdata.add_item(globus_path + file_name, "/home/paul/" + file_name)
 
@@ -78,6 +79,7 @@ def download_file(tc, endpoint_id, globus_path, file_name):
 
 
 def delete_file(tc, local_path, file_name):
+    print("deleting file {}".format(local_path + file_name))
     ddata = globus_sdk.DeleteData(tc, LOCAL_ID)
 
     ddata.add_item(local_path + file_name)
@@ -97,7 +99,6 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
         extension = file_name.split('.', 1)[1].strip() if '.' in file_name else "no extension"
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
-            print("collecting metadata from {}".format(full_file_name))
             metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
             print(metadata)
             # write metadata to file if there are aggregates
@@ -109,6 +110,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
 
 
 def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
+    print("collecting metadata from {}".format(globus_path + file_name))
     download_file(tc, endpoint_id, globus_path, file_name)
     local_path_to_file = local_path + file_name
 
