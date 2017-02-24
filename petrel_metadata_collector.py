@@ -39,6 +39,13 @@ def globus_first_login():
     print("EXPIRES_AT_SECONDS=" + str(globus_transfer_data['expires_at_seconds']))
     os.environ["EXPIRES_AT_SECONDS"] = globus_transfer_data['expires_at_seconds']
 
+    transfer_authorizer = globus_sdk.AccessTokenAuthorizer(globus_transfer_data)
+
+    # create a TransferClient object which Authorizes its calls using that GlobusAuthorizer
+    tc = globus_sdk.TransferClient(authorizer=transfer_authorizer)
+
+    return tc
+
 
 def get_globus_client():
     authorizer = globus_sdk.RefreshTokenAuthorizer(
@@ -131,7 +138,7 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
 
 
 # get client
-tc = get_globus_client()
+tc = globus_first_login()
 
 # # activate Petrel endpoint
 # tc.endpoint_autoactivate(PETREL_ID)
