@@ -91,12 +91,12 @@ def delete_file(tc, local_path, file_name):
 def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metadata_file, restart_file):
     for file_number in range(start_file_number, len(files)):
         full_file_name = files[file_number]
-        print("collecting metadata from {}".format(full_file_name))
         globus_path, file_name = full_file_name.rsplit("/", 1)
 
         extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
+            print("collecting metadata from {}".format(full_file_name))
             metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
             # write metadata to file if there are aggregates
             if "content_metadata" in metadata.keys():
