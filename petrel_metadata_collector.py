@@ -74,7 +74,7 @@ def download_file(tc, endpoint_id, globus_path, file_name):
     result = tc.submit_transfer(tdata)
 
     while not tc.task_wait(result["task_id"], polling_interval=1):
-        pass
+        print("waiting for download: {}".format(globus_path + file_name))
 
 
 def delete_file(tc, local_path, file_name):
@@ -94,14 +94,13 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
         globus_path, file_name = full_file_name.rsplit("/", 1)
 
         extension = file_name.split('.', 1)[1].strip() if '.' in file_name else "no extension"
-        print("{} == ||{}||".format(file_name, extension))
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
             print("collecting metadata from {}".format(full_file_name))
             metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
+            print(metadata)
             # write metadata to file if there are aggregates
             if "content_metadata" in metadata.keys():
-                print(metadata)
                 metadata_file.write(json.dumps(metadata) + ",")
 
         restart_file.truncate(0)
