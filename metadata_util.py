@@ -3,6 +3,7 @@ import json
 import numpy
 from netCDF4 import Dataset
 from decimal import Decimal
+from operator import itemgetter
 
 
 # TODO: bounding box method for lat and lon lists?
@@ -22,7 +23,7 @@ def get_metadata(file_name, path):
         metadata = {}
 
         try:
-            if extension != "nc":  # if extension in ["csv", "txt"]:
+            if extension in ["csv", "txt"]:
                 metadata = get_columnar_metadata(file_handle, extension)
         except StandardError:
             # not a columnar file
@@ -165,7 +166,7 @@ def get_columnar_metadata(file_handle, extension):
 
     # if there is a single header row and therefore were aggregates made, add the averages
     if num_header_rows == 1:
-        add_avg_to_aggregates(metadata, headers, header_types, num_value_rows)
+        add_final_aggregates(metadata, headers, header_types, num_value_rows)
 
     return metadata
 
@@ -192,25 +193,45 @@ def add_row_to_aggregates(metadata, row, headers, header_types, is_first_num_row
             # start of the metadata if this is the first row of values
             if is_first_num_row:
                 metadata[header] = {
-                    "min": value,
-                    "max": value,
-                    "total": value,
+                    "min": [float("inf"), float("inf"), float("inf")],
+                    "max": [None, None, None],
+                    "total": value
                 }
 
             # add row data to existing aggregates
             else:
-                if value < metadata[header]["min"]:
-                    metadata[header]["min"] = value
-                if value > metadata[header]["max"]:
-                    metadata[header]["max"] = value
+                if value < metadata[header]["min"][0]:
+                    metadata[header]["min"][1:2] = metadata[header]["min"][0:1]
+                    metadata[header]["min"][0] = value
+                elif value < metadata[header]["min"][1] and value != metadata[header]["min"][0]:
+                    metadata[header]["min"][2] = metadata[header]["min"][1]
+                    metadata[header]["min"][1] = value
+                elif value < metadata[header]["min"][2] and value not in metadata[header]["min"][:2]:
+                    metadata[header]["min"][2] = value
+                if value > metadata[header]["max"][0]:
+                    metadata[header]["max"][1:2] = metadata[header]["max"][0:1]
+                    metadata[header]["max"][0] = value
+                elif value > metadata[header]["max"][1] and value != metadata[header]["max"][0]:
+                    metadata[header]["max"][2] = metadata[header]["max"][1]
+                    metadata[header]["max"][1] = value
+                elif value > metadata[header]["max"][2] and value not in metadata[header]["max"][:2]:
+                    metadata[header]["max"][2] = value
                 metadata[header]["total"] += value
 
         elif header_type == "str":
-            # TODO: add string field aggregates?
+            # TODO: add string-specific field aggregates?
             pass
 
+        if is_first_num_row:
+            metadata[header]["frequencies"] = {str(value): 1}
+        else:
+            if str(value) in metadata[header]["frequencies"].keys():
+                metadata[header]["frequencies"][str(value)] += 1
+            else:
+                metadata[header]["frequencies"][str(value)] = 1
 
-def add_avg_to_aggregates(metadata, headers, header_types, num_value_rows):
+
+def add_final_aggregates(metadata, headers, header_types, num_value_rows):
     """Adds row data to aggregates.
 
         :param metadata: (dict) metadata dictionary to add to
@@ -221,11 +242,17 @@ def add_avg_to_aggregates(metadata, headers, header_types, num_value_rows):
     # calculate averages for numerical columns if aggregates were taken,
     # (which only happens when there is a single row of headers)
     for i in range(0, len(headers)):
+        header = headers[i]
+        metadata[header]["mode"] = max(metadata[header]["frequencies"].iteritems(), key=itemgetter(1))[0]
+        metadata[header].pop("frequencies")
+
         if header_types[i] == "num":
-            header = headers[i]
+            metadata[header]["max"] = [val for val in metadata[header]["max"] if val is not None]
+            metadata[header]["min"] = [val for val in metadata[header]["min"] if val != float("inf")]
+
             metadata[header]["avg"] = round(
                 metadata[header]["total"] / num_value_rows,
-                max_precision([metadata[header]["min"], metadata[header]["max"]])
+                max_precision([metadata[header]["min"][0], metadata[header]["max"][0]])
             )
             metadata[header].pop("total")
 

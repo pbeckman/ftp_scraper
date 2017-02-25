@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import csv
 import json
 import globus_sdk
 from hashlib import sha256
@@ -98,7 +99,7 @@ def delete_file(tc, local_path, file_name):
     result = tc.submit_delete(ddata)
 
 
-def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metadata_file, restart_file):
+def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_writer, restart_file):
     for file_number in range(start_file_number, len(files)):
         full_file_name = files[file_number]
         globus_path, file_name = full_file_name.strip().rsplit("/", 1)
@@ -108,11 +109,12 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, metada
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
             metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
-            print(metadata)
             # write metadata to file if there are aggregates
             try:
-                if "content_metadata" in metadata.keys():
-                    metadata_file.write(json.dumps(metadata) + ",")
+                if "content_metadata" in metadata.keys() and len(metadata["content_metadata"].keys()) > 1:
+                    print("writing to col_metadata.csv:")
+                    print(metadata)
+                    write_dict_to_csv(metadata, csv_writer)
             except:
                 pass
 
@@ -142,6 +144,30 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
     return metadata
 
 
+def write_dict_to_csv(metadata, csv_writer):
+    for col in set(metadata["content_metadata"].keys()) - set("headers"):
+        col_agg = metadata[col]
+        csv_writer.writerow([
+            metadata["path"], metadata["file"], col,
+
+            col_agg["min"][0] if "min" in col_agg.keys() else None,
+            col_agg["min"][1] - col_agg["min"][0] if "min" in col_agg.keys() and len(col_agg["min"]) > 1 else None,
+            col_agg["min"][1] if "min" in col_agg.keys() and len(col_agg["min"]) > 1 else None,
+            col_agg["min"][2] - col_agg["min"][1] if "min" in col_agg.keys() and len(col_agg["min"]) > 2 else None,
+            col_agg["min"][2] if "min" in col_agg.keys() and len(col_agg["min"]) > 2 else None,
+
+            col_agg["max"][0] if "max" in col_agg.keys() else None,
+            col_agg["max"][0] - col_agg["max"][1] if "max" in col_agg.keys() and len(col_agg["max"]) > 1 else None,
+            col_agg["max"][1] if "max" in col_agg.keys() and len(col_agg["max"]) > 1 else None,
+            col_agg["max"][1] - col_agg["max"][2] if "max" in col_agg.keys() and len(col_agg["max"]) > 2 else None,
+            col_agg["max"][2] if "max" in col_agg.keys() and len(col_agg["max"]) > 2 else None,
+
+            col_agg["avg"] if "avg" in col_agg.keys() else None,
+            col_agg["mode"] if "mode" in col_agg.keys() else None,
+
+            None, None, None  # spaces for null values to be recorded by hand
+        ])
+
 # get client
 tc = get_globus_client()
 
@@ -158,10 +184,18 @@ tc = get_globus_client()
 
 # print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
-with open("pub8_list.txt", "r") as file_list:
-    with open("metadata.json", "w") as metadata_file:
-        with open("restart.txt", "w") as restart_file:
-            metadata_file.write("{data:[")
-            write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", metadata_file, restart_file)
-            metadata_file.write("]}")
+csv_writer = csv.writer(open("col_metadata.csv", "w"))
+csv_writer.writerow([
+    "path", "file", "column",
+    "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
+    "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
+    "avg", "mode",
+    "null_1", "null_2", "null_3"
+])
 
+with open("pub8_list.txt", "r") as file_list:
+    with open("restart.txt", "w") as restart_file:
+        write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", csv_writer, restart_file)
+
+# metadata = get_metadata("single_header.csv", "test_files/")
+# write_dict_to_csv(metadata, csv_writer)
