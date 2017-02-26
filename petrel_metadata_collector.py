@@ -111,7 +111,8 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
             metadata = {}
             try:
                 metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
-            except:
+            except Exception as e:
+                print("caught exception getting metadata: " + str(e))
                 pass
 
             print(metadata)
