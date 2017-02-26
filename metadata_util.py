@@ -257,7 +257,7 @@ def add_final_aggregates(metadata, headers, header_types, num_value_rows):
             metadata[header]["avg"] = round(
                 metadata[header]["total"] / num_value_rows,
                 max_precision([metadata[header]["min"][0], metadata[header]["max"][0]])
-            )
+            ) if len(metadata[header]["min"]) > 0 else None
             metadata[header].pop("total")
 
 
