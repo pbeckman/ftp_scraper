@@ -114,7 +114,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
                 metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
             except Exception as e:
                 with open("errors.log", "a") as error_file:
-                    error_file.write("{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.print_exc()))
+                    error_file.write("{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
 
             # write metadata to file if there are aggregates
             if "content_metadata" in metadata.keys() and len(metadata["content_metadata"].keys()) > 1:
@@ -125,7 +125,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
                 except Exception as e:
                     with open("errors.log", "a") as error_file:
                         error_file.write(
-                            "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.print_exc()))
+                            "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
 
         restart_file.write("{},{}".format(file_number, full_file_name))
 
@@ -209,7 +209,7 @@ csv_writer = csv.writer(open("col_metadata.csv", "a"))
 
 with open("pub8_list.txt", "r") as file_list:
     with open("restart.txt", "a") as restart_file:
-        write_metadata(tc, PETREL_ID, file_list.readlines(), 2868, "/home/paul/", csv_writer, restart_file)
+        write_metadata(tc, PETREL_ID, file_list.readlines(), 2965, "/home/paul/", csv_writer, restart_file)
 
 # metadata = get_metadata("single_header.csv", "test_files/")
 # write_dict_to_csv(metadata, csv_writer)
