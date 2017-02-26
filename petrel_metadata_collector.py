@@ -76,10 +76,10 @@ def write_file_list(tc, endpoint_id, globus_path, list_file):
             list_file.write(item_path + '\n')
 
 
-def download_file(tc, endpoint_id, globus_path, file_name):
+def download_file(tc, endpoint_id, globus_path, file_name, local_path):
     print("downloading file {}".format(globus_path + file_name))
     tdata = globus_sdk.TransferData(tc, endpoint_id, LOCAL_ID)
-    tdata.add_item(globus_path + file_name, "/home/paul/" + file_name)
+    tdata.add_item(globus_path + file_name, local_path + file_name)
 
     result = tc.submit_transfer(tdata)
 
@@ -128,7 +128,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
 
 def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
     print("collecting metadata from {}".format(globus_path + file_name))
-    download_file(tc, endpoint_id, globus_path, file_name)
+    download_file(tc, endpoint_id, globus_path, file_name, local_path)
     local_path_to_file = local_path + file_name
 
     extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
@@ -140,6 +140,7 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
     }
 
     content_metadata = get_metadata(file_name, local_path)
+    print(content_metadata)
 
     delete_file(tc, local_path, file_name)
 
