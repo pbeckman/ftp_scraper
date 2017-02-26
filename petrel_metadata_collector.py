@@ -1,7 +1,7 @@
 from __future__ import print_function
 import os
 import csv
-import json
+import traceback
 import globus_sdk
 from hashlib import sha256
 from re import compile
@@ -108,7 +108,15 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
         extension = file_name.split('.', 1)[1].strip() if '.' in file_name else "no extension"
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
-            metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
+
+            try:
+                metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
+            except Exception as e:
+                with open("errors.log", "a") as error_file:
+                    error_file.write("{}{} :: {}\n".format(globus_path, file_name, str(e)))
+                traceback.print_exc()
+                if raw_input("continue? (y/n)\n") != "y":
+                    raise e
 
             # write metadata to file if there are aggregates
             if "content_metadata" in metadata.keys() and len(metadata["content_metadata"].keys()) > 1:
@@ -134,12 +142,8 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
 
     content_metadata = {}
 
-    try:
-        content_metadata = get_metadata(file_name, local_path)
-    except Exception as e:
-        with open("errors.log", "a") as error_file:
-            error_file.write("{}{} :: {}\n".format(globus_path, file_name, str(e)))
-        raise e
+    content_metadata = get_metadata(file_name, local_path)
+
 
     delete_file(tc, local_path, file_name)
 
