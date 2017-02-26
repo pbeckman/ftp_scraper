@@ -186,7 +186,7 @@ tc = get_globus_client()
 
 # print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
-csv_writer = csv.writer(open("col_metadata.csv", "a"))
+csv_writer = csv.writer(open("col_metadata.csv", "w"))
 csv_writer.writerow([
     "path", "file", "column",
     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
