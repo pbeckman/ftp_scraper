@@ -197,7 +197,7 @@ csv_writer.writerow([
 
 with open("pub8_list.txt", "r") as file_list:
     with open("restart.txt", "a") as restart_file:
-        write_metadata(tc, PETREL_ID, file_list.readlines(), 2157, "/home/paul/", csv_writer, restart_file)
+        write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", csv_writer, restart_file)
 
 # metadata = get_metadata("single_header.csv", "test_files/")
 # write_dict_to_csv(metadata, csv_writer)
