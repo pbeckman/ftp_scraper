@@ -178,14 +178,14 @@ def get_columnar_metadata(file_handle, extension):
     return metadata
 
 
-def add_row_to_aggregates(metadata, row, headers, header_types, is_first_num_row):
+def add_row_to_aggregates(metadata, row, headers, header_types, is_first_value_row):
     """Adds row data to aggregates.
 
         :param metadata: (dict) metadata dictionary to add to
         :param row: (list(str)) row of strings to add
         :param headers: (list(str)) list of headers
         :param header_types: (list("num" | "str")) list of header types
-        :param is_first_num_row: (bool) whether this is the first num row, so we need to initialize
+        :param is_first_value_row: (bool) whether this is the first value row, so we need to initialize
         the necessary aggregate dictionary in the metadata"""
 
     for i in range(0, len(row)):
@@ -193,17 +193,24 @@ def add_row_to_aggregates(metadata, row, headers, header_types, is_first_num_row
         header = headers[i]
         header_type = header_types[i]
 
+        if is_first_value_row:
+            metadata[header] = {}
+            metadata[header]["frequencies"] = {str(value): 1}
+        else:
+            if str(value) in metadata[header]["frequencies"].keys():
+                metadata[header]["frequencies"][str(value)] += 1
+            else:
+                metadata[header]["frequencies"][str(value)] = 1
+
         if header_type == "num":
             # cast the field to a number to do numerical aggregates
             value = float(value)
 
-            # start of the metadata if this is the first row of values
-            if is_first_num_row:
-                metadata[header] = {
-                    "min": [float("inf"), float("inf"), float("inf")],
-                    "max": [None, None, None],
-                    "total": value
-                }
+            # start off the metadata if this is the first row of values
+            if is_first_value_row:
+                metadata[header]["min"] = [float("inf"), float("inf"), float("inf")]
+                metadata[header]["max"] = [None, None, None]
+                metadata[header]["total"] = value
 
             # add row data to existing aggregates
             else:
@@ -228,14 +235,6 @@ def add_row_to_aggregates(metadata, row, headers, header_types, is_first_num_row
         elif header_type == "str":
             # TODO: add string-specific field aggregates?
             pass
-
-        if is_first_num_row:
-            metadata[header]["frequencies"] = {str(value): 1}
-        else:
-            if str(value) in metadata[header]["frequencies"].keys():
-                metadata[header]["frequencies"][str(value)] += 1
-            else:
-                metadata[header]["frequencies"][str(value)] = 1
 
 
 def add_final_aggregates(metadata, headers, header_types, num_value_rows):
