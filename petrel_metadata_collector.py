@@ -143,6 +143,9 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
 
 
 def write_dict_to_csv(metadata, csv_writer):
+    print("------")
+    print(set(metadata["content_metadata"].keys()) - set("headers"))
+    print("------")
     for col in set(metadata["content_metadata"].keys()) - set("headers"):
         col_agg = metadata["content_metadata"][col]
         print(col_agg)
