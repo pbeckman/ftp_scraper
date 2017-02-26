@@ -32,7 +32,6 @@ def get_metadata(file_name, path):
                 metadata = get_columnar_metadata(file_handle, extension)
         except ExtractionError:
             # not a columnar file
-            print("Extraction error caught -> not a columnar file")
             pass
 
         if extension == "nc":

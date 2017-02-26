@@ -187,17 +187,17 @@ tc = get_globus_client()
 # print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
 csv_writer = csv.writer(open("col_metadata.csv", "a"))
-csv_writer.writerow([
-    "path", "file", "column",
-    "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
-    "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
-    "avg", "mode",
-    "null_1", "null_2", "null_3"
-])
+# csv_writer.writerow([
+#     "path", "file", "column",
+#     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
+#     "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
+#     "avg", "mode",
+#     "null_1", "null_2", "null_3"
+# ])
 
 with open("pub8_list.txt", "r") as file_list:
     with open("restart.txt", "a") as restart_file:
-        write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", csv_writer, restart_file)
+        write_metadata(tc, PETREL_ID, file_list.readlines(), 2788, "/home/paul/", csv_writer, restart_file)
 
 # metadata = get_metadata("single_header.csv", "test_files/")
 # write_dict_to_csv(metadata, csv_writer)
