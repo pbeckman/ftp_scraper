@@ -116,7 +116,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
                 print(metadata)
                 write_dict_to_csv(metadata, csv_writer)
 
-        restart_file.write("{},{}\n".format(file_number, full_file_name))
+        restart_file.write("{},{}".format(file_number, full_file_name))
 
 
 def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
@@ -186,7 +186,7 @@ tc = get_globus_client()
 
 # print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
-csv_writer = csv.writer(open("col_metadata.csv", "w"))
+csv_writer = csv.writer(open("col_metadata.csv", "a"))
 csv_writer.writerow([
     "path", "file", "column",
     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
