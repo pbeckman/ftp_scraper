@@ -159,18 +159,16 @@ def write_dict_to_csv(metadata, csv_writer):
     cols.remove("headers")
     for col in cols:
         col_agg = metadata["content_metadata"][col]
-        print(col_agg)
-        print(col_agg.keys())
         csv_writer.writerow([
             metadata["path"], metadata["file"], col,
 
-            col_agg["min"][0] if "min" in col_agg.keys() else None,
+            col_agg["min"][0] if "min" in col_agg.keys() and len(col_agg["min"]) > 0 else None,
             col_agg["min"][1] - col_agg["min"][0] if "min" in col_agg.keys() and len(col_agg["min"]) > 1 else None,
             col_agg["min"][1] if "min" in col_agg.keys() and len(col_agg["min"]) > 1 else None,
             col_agg["min"][2] - col_agg["min"][1] if "min" in col_agg.keys() and len(col_agg["min"]) > 2 else None,
             col_agg["min"][2] if "min" in col_agg.keys() and len(col_agg["min"]) > 2 else None,
 
-            col_agg["max"][0] if "max" in col_agg.keys() else None,
+            col_agg["max"][0] if "max" in col_agg.keys() and len(col_agg["max"]) > 0 else None,
             col_agg["max"][0] - col_agg["max"][1] if "max" in col_agg.keys() and len(col_agg["max"]) > 1 else None,
             col_agg["max"][1] if "max" in col_agg.keys() and len(col_agg["max"]) > 1 else None,
             col_agg["max"][1] - col_agg["max"][2] if "max" in col_agg.keys() and len(col_agg["max"]) > 2 else None,
