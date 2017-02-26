@@ -32,7 +32,7 @@ def get_metadata(file_name, path):
                 metadata = get_columnar_metadata(file_handle, extension)
         except ExtractionError:
             # not a columnar file
-            print("NOT A COLUMNAR FILE")
+            print "ExtractionError caught"
             pass
 
         if extension == "nc":
@@ -144,6 +144,7 @@ def get_columnar_metadata(file_handle, extension):
     for row in reader:
         # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
         if not first_row and row_length != len(row):
+            print "raising ExtractionError"
             raise ExtractionError
         first_row = False
         # update row length for next check
