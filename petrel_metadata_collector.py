@@ -109,6 +109,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
         # for null value collection only process these 3 types
         if extension in ["csv", "txt", "dat"]:
 
+            metadata = {}
             try:
                 metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
             except Exception as e:
