@@ -114,11 +114,11 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
             except:
                 pass
 
-            print(metadata)
             # write metadata to file if there are aggregates
             try:
                 if "content_metadata" in metadata.keys() and len(metadata["content_metadata"].keys()) > 1:
                     print("writing to col_metadata.csv:")
+                    print(metadata)
                     write_dict_to_csv(metadata, csv_writer)
             except:
                 pass
@@ -140,7 +140,6 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
     }
 
     content_metadata = get_metadata(file_name, local_path)
-    print(content_metadata)
 
     delete_file(tc, local_path, file_name)
 

@@ -9,6 +9,11 @@ from operator import itemgetter
 # TODO: bounding box method for lat and lon lists?
 # TODO: granularity of data?
 
+
+class ExtractionError(Exception):
+    """Basic error to throw when an extractor fails"""
+
+
 def get_metadata(file_name, path):
     """Create metadata JSON from file.
 
@@ -25,8 +30,9 @@ def get_metadata(file_name, path):
         try:
             if extension in ["csv", "txt"]:
                 metadata = get_columnar_metadata(file_handle, extension)
-        except StandardError:
+        except ExtractionError:
             # not a columnar file
+            print("NOT A COLUMNAR FILE")
             pass
 
         if extension == "nc":
@@ -114,7 +120,7 @@ def get_columnar_metadata(file_handle, extension):
         :param file_handle: (file) open file
         :param extension: (str) file extension used to determine csv.reader parameters
         :returns: (dict) ascertained metadata
-        :raises: (StandardError) if the file cannot be read as a columnar file"""
+        :raises: (ExtractionError) if the file cannot be read as a columnar file"""
 
     # TODO: determine if whitespace separation for non-csv, and comma separated excel dialect for csv are effective
 
@@ -138,7 +144,7 @@ def get_columnar_metadata(file_handle, extension):
     for row in reader:
         # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
         if not first_row and row_length != len(row):
-            raise StandardError
+            raise ExtractionError
         first_row = False
         # update row length for next check
         row_length = len(row)
