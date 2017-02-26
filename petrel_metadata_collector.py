@@ -146,6 +146,7 @@ def write_dict_to_csv(metadata, csv_writer):
     for col in set(metadata["content_metadata"].keys()) - set("headers"):
         col_agg = metadata["content_metadata"][col]
         print(col_agg)
+        print(col_agg.keys())
         csv_writer.writerow([
             metadata["path"], metadata["file"], col,
 
