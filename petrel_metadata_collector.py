@@ -14,12 +14,11 @@ PETREL_ID = os.environ["PETREL_ID"]
 LOCAL_ID = os.environ["LOCAL_ID"]
 TRANSFER_TOKEN = os.environ["TRANSFER_TOKEN"]
 
-# create a client object that tracks state as we do this flow
-client = None  # globus_sdk.NativeAppAuthClient(LOCAL_ID)
-
-
 def globus_first_login():
     # This method should only have to be run once EVER per user to get refresh token environment variable
+
+    # create a client object that tracks state as we do this flow
+    client = globus_sdk.NativeAppAuthClient(LOCAL_ID)
 
     # explicitly start the flow (some clients may support multiple flows)
     client.oauth2_start_flow_native_app()  # refresh_tokens=True
@@ -180,7 +179,7 @@ def write_dict_to_csv(metadata, csv_writer):
         ])
 
 # get client
-tc = get_globus_client()
+# tc = get_globus_client()
 
 # # activate Petrel endpoint
 # tc.endpoint_autoactivate(PETREL_ID)
@@ -195,7 +194,7 @@ tc = get_globus_client()
 
 # print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
-csv_writer = csv.writer(open("col_metadata.csv", "a"))
+# csv_writer = csv.writer(open("col_metadata.csv", "a"))
 # csv_writer.writerow([
 #     "path", "file", "column",
 #     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
@@ -204,9 +203,9 @@ csv_writer = csv.writer(open("col_metadata.csv", "a"))
 #     "null_1", "null_2", "null_3"
 # ])
 
-with open("pub8_list.txt", "r") as file_list:
-    with open("restart.txt", "a") as restart_file:
-        write_metadata(tc, PETREL_ID, file_list.readlines(), 2965, "/home/paul/", csv_writer, restart_file)
+# with open("pub8_list.txt", "r") as file_list:
+#     with open("restart.txt", "a") as restart_file:
+#         write_metadata(tc, PETREL_ID, file_list.readlines(), 2965, "/home/paul/", csv_writer, restart_file)
 
 # metadata = get_metadata("single_header.csv", "test_files/")
 # write_dict_to_csv(metadata, csv_writer)
