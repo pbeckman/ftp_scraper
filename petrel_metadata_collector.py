@@ -143,10 +143,7 @@ def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
         "size": os.path.getsize(local_path_to_file)
     }
 
-    content_metadata = {}
-
     content_metadata = get_metadata(file_name, local_path)
-
 
     delete_file(tc, local_path, file_name)
 
