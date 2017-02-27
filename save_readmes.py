@@ -17,10 +17,13 @@ def save_readmes(tc, endpoint_id, local_path, files, start_file_number):
             tdata = globus_sdk.TransferData(tc, endpoint_id, LOCAL_ID)
             tdata.add_item(globus_path + file_name, local_path + file_name + str(i))
 
-            tc.submit_transfer(tdata)
+            result = tc.submit_transfer(tdata)
+
+            while not tc.task_wait(result["task_id"], polling_interval=1, timeout=60):
+                print("waiting for download: {}".format(globus_path + file_name))
 
 
 tc = get_globus_client()
 
 with open("pub8_list.txt", "r") as file_list:
-    save_readmes(tc, PETREL_ID, "/home/paul/", file_list.readlines(), 0)
+    save_readmes(tc, PETREL_ID, "/home/paul/", file_list.readlines(), 3066)
