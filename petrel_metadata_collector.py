@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import time
 import csv
 import traceback
 import globus_sdk
@@ -76,14 +77,15 @@ def write_file_list(tc, endpoint_id, globus_path, list_file):
 
 
 def download_file(tc, endpoint_id, globus_path, file_name, local_path):
-    print("downloading file {}".format(globus_path + file_name))
+    # print("downloading file {}".format(globus_path + file_name))
     tdata = globus_sdk.TransferData(tc, endpoint_id, LOCAL_ID)
     tdata.add_item(globus_path + file_name, local_path + file_name)
 
     result = tc.submit_transfer(tdata)
 
     while not tc.task_wait(result["task_id"], polling_interval=1, timeout=60):
-        print("waiting for download: {}".format(globus_path + file_name))
+        pass
+        # print("waiting for download: {}".format(globus_path + file_name))
 
 
 def delete_file(tc, local_path, file_name):
@@ -117,8 +119,8 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
 
             # write metadata to file if there are aggregates
             if "content_metadata" in metadata.keys() and len(metadata["content_metadata"].keys()) > 1:
-                print("writing to col_metadata.csv:")
-                print(metadata)
+                # print("writing to col_metadata.csv:")
+                # print(metadata)
                 try:
                     write_dict_to_csv(metadata, csv_writer)
                 except Exception as e:
@@ -130,7 +132,7 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
 
 
 def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
-    print("collecting metadata from {}".format(globus_path + file_name))
+    # print("collecting metadata from {}".format(globus_path + file_name))
     download_file(tc, endpoint_id, globus_path, file_name, local_path)
     local_path_to_file = local_path + file_name
 
@@ -179,7 +181,7 @@ def write_dict_to_csv(metadata, csv_writer):
         ])
 
 # get client
-# tc = get_globus_client()
+tc = get_globus_client()
 
 # # activate Petrel endpoint
 # tc.endpoint_autoactivate(PETREL_ID)
@@ -194,18 +196,23 @@ def write_dict_to_csv(metadata, csv_writer):
 
 # print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
-# csv_writer = csv.writer(open("col_metadata.csv", "a"))
-# csv_writer.writerow([
-#     "path", "file", "column",
-#     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
-#     "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
-#     "avg", "mode",
-#     "null_1", "null_2", "null_3"
-# ])
+t0 = time.time()
 
-# with open("pub8_list.txt", "r") as file_list:
-#     with open("restart.txt", "a") as restart_file:
-#         write_metadata(tc, PETREL_ID, file_list.readlines(), 2965, "/home/paul/", csv_writer, restart_file)
+csv_writer = csv.writer(open("col_metadata.csv", "a"))
+csv_writer.writerow([
+    "path", "file", "column",
+    "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
+    "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
+    "avg", "mode",
+    "null_1", "null_2", "null_3"
+])
 
+with open("pub8_list.txt", "r") as file_list:
+    with open("restart.txt", "a") as restart_file:
+        write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", csv_writer, restart_file)
+
+t1 = time.time()
+
+print("time taken: {}".format(str(t1-t0)))
 # metadata = get_metadata("single_header.csv", "test_files/")
 # write_dict_to_csv(metadata, csv_writer)
