@@ -9,6 +9,7 @@ TRANSFER_TOKEN = os.environ["TRANSFER_TOKEN"]
 def save_readmes(tc, endpoint_id, local_path, files, start_file_number):
     for full_file_name in files[start_file_number:]:
         globus_path, file_name = full_file_name.strip().rsplit("/", 1)
+        globus_path += "/"
         if "readme" in file_name.lower():
             download_file(tc, endpoint_id, globus_path, file_name, local_path)
 
