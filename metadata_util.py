@@ -29,8 +29,7 @@ def get_metadata(file_name, path):
         metadata = {}
 
         try:
-            if extension in ["csv", "txt"]:
-                metadata = get_columnar_metadata(file_handle)
+            metadata = get_columnar_metadata(file_handle)
         except ExtractionError:
             # not a columnar file
             pass
@@ -123,13 +122,15 @@ def get_columnar_metadata(file_handle):
     extension = file_handle.name.split('.', 1)[1] if '.' in file_handle.name else "no extension"
 
     # choose csv.reader parameters based on file type - if not csv, use space-delimited
-    if extension in ["csv", "exc.csv"]:
-        reader = csv.reader(file_handle, skipinitialspace=True)
-    else:
-        reader = SpaceDelimitedReader(file_handle)
+    reverse_reader = ReverseReader(file_handle, delimiter="," if extension in ["csv", "exc.csv"] else " ")
 
     # base dictionary in which to store all the metadata
     metadata = {"columns": {}}
+
+    # minimum number of rows to be considered an extractable table
+    min_rows = 3
+    # size of extracted free-text preamble in characters
+    preamble_size = 1000
 
     headers = []
     col_types = []
@@ -138,31 +139,47 @@ def get_columnar_metadata(file_handle):
     num_header_rows = 0
     # used to check if all rows are the same length, if not, this is not a valid columnar file
     row_length = 0
-    first_row = True
+    is_first_row = True
+    fully_parsed = True
 
-    for row in reader:
+    # save the last l rows to try to parse them later
+    last_rows = [reverse_reader.next() for i in range(0, 3)]
+
+    # now we try to extract a table from the remaining n-l rows
+    for row in reverse_reader:
         # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
-        if not first_row and row_length != len(row):
-            raise ExtractionError
-        first_row = False
+        if not is_first_row and row_length != len(row):
+            # tables are not worth extracting if under this row threshold
+            if num_value_rows < min_rows:
+                raise ExtractionError
+            else:
+                fully_parsed = False
+                break
         # update row length for next check
         row_length = len(row)
 
-        # make column aliases so that we can create aggregates even for unlabelled columns
-        col_aliases = ["__{}__".format(i) for i in range(0, row_length)]
+        if is_first_row:
+            # make column aliases so that we can create aggregates even for unlabelled columns
+            col_aliases = ["__{}__".format(i) for i in range(0, row_length)]
+        is_first_row = False
 
         # if the row is a header row, add all its fields to the headers list
         if is_header_row(row):
+            # tables are likely not representative of the file if under this row threshold, so so not extract metadata
+            if num_value_rows < min_rows:
+                raise ExtractionError
+            # set the column aliases to the most recent header row if they are unique
+            if len(set(row)) == len(row):
+                for i in range(0, len(row)):
+                    metadata["columns"][row[i]] = metadata["columns"].pop(col_aliases[i])
+                col_aliases = row
+
             num_header_rows += 1
             for header in row:
                 if header != "":
                     headers.append(header)
 
         else:
-            # set the column aliases to the headers if they are 1-to-1 (single header row)
-            if num_header_rows == 1:
-                col_aliases = headers
-
             num_value_rows += 1
 
             # type check the first row to decide which aggregates to use
@@ -171,9 +188,31 @@ def get_columnar_metadata(file_handle):
 
             add_row_to_aggregates(metadata, row, col_aliases, col_types, num_value_rows == 1)
 
+    # add the originally skipped rows into the aggregates
+    for row in last_rows:
+        if len(row) == row_length:
+            add_row_to_aggregates(metadata, row, col_aliases, col_types, num_value_rows == 1)
+
+    # number of characters in file before last un-parse-able row
+    if not fully_parsed:
+        file_handle.seek(reverse_reader.prev_position)
+    remaining_chars = file_handle.tell() - 1
+    # extract free-text preamble, which may contain headers
+    if remaining_chars >= preamble_size:
+        file_handle.seek(-preamble_size, 1)
+    else:
+        file_handle.seek(0)
+    preamble = ""
+    # do this instead of passing an argument to read() to avoid multi-byte character encoding difficulties
+    while file_handle.tell() <= reverse_reader.prev_position:
+        preamble += file_handle.read(1)
+    # add it to the metadata if the whole file hasn't already been processed
+    if len(preamble) > 0:
+        metadata["preamble"] = preamble
+
     # add header list to metadata
     if len(headers) > 0:
-        metadata["headers"] = headers
+        metadata["headers"] = list(set(headers))
 
     add_final_aggregates(metadata, col_aliases, col_types, num_value_rows)
 
@@ -280,34 +319,45 @@ def max_precision(nums):
     return max([abs(Decimal(str(num)).as_tuple().exponent) for num in nums])
 
 
-class SpaceDelimitedReader:
-    """Reader for space delimited files. Acts in the same way as the standard csv.reader
+class ReverseReader:
+    """Reads column-formatted files in reverse as lists of fields.
 
         :param file_handle: (file) open file """
 
-    def __init__(self, file_handle):
+    def __init__(self, file_handle, delimiter=","):
         self.fh = file_handle
-        self.dialect = ""
-        self.line_num = 0
+        self.fh.seek(0, os.SEEK_END)
+        self.delimiter = delimiter
+        self.position = self.fh.tell()
+        self.prev_position = self.fh.tell()
+
+    @staticmethod
+    def fields(line, delimiter):
+        return [field.strip() for field in line.split(delimiter) if delimiter != " " or field.strip() != ""]
 
     def next(self):
-        fields = []
-        line = self.fh.readline()
-        if line == "":
+        line = ''
+        if self.position <= 0:
             raise StopIteration
-        for field in line.split(" "):
-            stripped_field = field.strip()
-            if stripped_field != "":
-                fields.append(stripped_field)
-        self.line_num += 1
-        return fields
+        self.prev_position = self.position
+        while self.position >= 0:
+            self.fh.seek(self.position)
+            next_char = self.fh.read(1)
+            if next_char in ['\n', '\r']:
+                self.position -= 1
+                if len(line) > 1:
+                    return self.fields(line[::-1], self.delimiter)
+            else:
+                line += next_char
+                self.position -= 1
+        return self.fields(line[::-1], self.delimiter)
 
     def __iter__(self):
         return self
 
 
 def is_header_row(row):
-    """Determine if row is a header row by checking if it contains any fields that are
+    """Determine if row is a header row by checking that it contains no fields that are
     only numeric.
 
         :param row: (list(str)) list of fields in row
