@@ -2,9 +2,8 @@ import csv
 import json
 import os
 from ftplib import FTP
-from catalog_maker import write_agg, write_catalog
-from metadata_util import get_metadata, ReverseReader
-from ftp_metadata_collector import write_metadata
+# from catalog_maker import write_agg, write_catalog
+from metadata_util import extract_metadata, ReverseReader
 
 # ftp = FTP("cdiac.ornl.gov")
 # ftp.login()
@@ -31,32 +30,22 @@ def display_metadata(file_name, path):
     {}
     ----------------------------
     """.format(path + file_name)
-    print json.dumps(get_metadata(file_name, path), sort_keys=True, indent=4, separators=(',', ': '))
+    print json.dumps(extract_metadata(file_name, path), sort_keys=True, indent=4, separators=(',', ': '))
 
 
-def toy_metadata_collection():
+def test_metadata_extraction():
     # display_metadata("some_netcdf.nc", "test_files/")
     # display_metadata("single_header.csv", "test_files/")
     # display_metadata("readme.txt", "test_files/")
     # display_metadata("multiple_headers.csv", "test_files/")
     # display_metadata("single_header.txt", "test_files/")
     # display_metadata("preamble.exc.csv", "test_files/")
-    display_metadata("preamble.dat", "test_files/")
-    # display_metadata("preamble.c32", "test_files/")
+    # display_metadata("preamble.dat", "test_files/")
+    display_metadata("preamble.c32", "test_files/")
 
 
 def write_agg_csv(agg_writer, agg):
     for extension, extension_data in agg.iteritems():
         agg_writer.writerow([extension, extension_data["total_bytes"], extension_data["total_bytes_with_metadata"]])
 
-
-def collect_metadata(directory):
-    print "collecting metadata from {}".format(directory)
-    with open("metadata.json", "w") as metadata_file:
-        metadata_file.write("{\"data\":[")
-        write_agg_csv(agg_writer, write_metadata(ftp, metadata_file, directory))
-        metadata_file.seek(-1, os.SEEK_END)
-        metadata_file.truncate()
-        metadata_file.write("]}")
-
-toy_metadata_collection()
+test_metadata_extraction()

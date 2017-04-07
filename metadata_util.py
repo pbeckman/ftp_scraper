@@ -2,6 +2,7 @@ import csv
 import json
 import numpy
 import os
+import re
 from netCDF4 import Dataset
 from decimal import Decimal
 from operator import itemgetter
@@ -15,7 +16,7 @@ class ExtractionError(Exception):
     """Basic error to throw when an extractor fails"""
 
 
-def get_metadata(file_name, path):
+def extract_metadata(file_name, path):
     """Create metadata JSON from file.
 
         :param file_name: (str) file name
@@ -29,18 +30,18 @@ def get_metadata(file_name, path):
         metadata = {}
 
         try:
-            metadata = get_columnar_metadata(file_handle)
+            metadata = extract_columnar_metadata(file_handle)
         except ExtractionError:
             # not a columnar file
             pass
 
         if extension == "nc":
-            metadata = get_netcdf_metadata(file_handle)
+            metadata = extract_netcdf_metadata(file_handle)
 
     return metadata
 
 
-def get_netcdf_metadata(file_handle):
+def extract_netcdf_metadata(file_handle):
     """Create netcdf metadata JSON from file.
 
         :param file_handle: (str) file
@@ -112,7 +113,7 @@ class NumpyDecoder(json.JSONEncoder):
             return super(NumpyDecoder, self).default(obj)
 
 
-def get_columnar_metadata(file_handle):
+def extract_columnar_metadata(file_handle):
     """Get metadata from column-formatted file.
 
         :param file_handle: (file) open file
@@ -121,8 +122,8 @@ def get_columnar_metadata(file_handle):
 
     extension = file_handle.name.split('.', 1)[1] if '.' in file_handle.name else "no extension"
 
-    # choose csv.reader parameters based on file type - if not csv, use space-delimited
-    reverse_reader = ReverseReader(file_handle, delimiter="," if extension in ["csv", "exc.csv"] else " ")
+    # choose csv.reader parameters based on file type - if not csv, use whitespace-delimited
+    reverse_reader = ReverseReader(file_handle, delimiter="," if extension in ["csv", "exc.csv"] else "whitespace")
 
     # base dictionary in which to store all the metadata
     metadata = {"columns": {}}
@@ -196,19 +197,19 @@ def get_columnar_metadata(file_handle):
     # number of characters in file before last un-parse-able row
     if not fully_parsed:
         file_handle.seek(reverse_reader.prev_position)
-    remaining_chars = file_handle.tell() - 1
-    # extract free-text preamble, which may contain headers
-    if remaining_chars >= preamble_size:
-        file_handle.seek(-preamble_size, 1)
-    else:
-        file_handle.seek(0)
-    preamble = ""
-    # do this instead of passing an argument to read() to avoid multi-byte character encoding difficulties
-    while file_handle.tell() <= reverse_reader.prev_position:
-        preamble += file_handle.read(1)
-    # add it to the metadata if the whole file hasn't already been processed
-    if len(preamble) > 0:
-        metadata["preamble"] = preamble
+        remaining_chars = file_handle.tell() - 1
+        # extract free-text preamble, which may contain headers
+        if remaining_chars >= preamble_size:
+            file_handle.seek(-preamble_size, 1)
+        else:
+            file_handle.seek(0)
+        preamble = ""
+        # do this instead of passing an argument to read() to avoid multi-byte character encoding difficulties
+        while file_handle.tell() <= reverse_reader.prev_position:
+            preamble += file_handle.read(1)
+        # add preamble to the metadata if the whole file hasn't already been processed
+        if len(preamble) > 0:
+            metadata["preamble"] = preamble
 
     # add header list to metadata
     if len(headers) > 0:
@@ -245,7 +246,11 @@ def add_row_to_aggregates(metadata, row, col_aliases, col_types, is_first_value_
 
         if col_type == "num":
             # cast the field to a number to do numerical aggregates
-            value = float(value)
+            # the try except is used to pass over textual and black space nulls on which type coercion will fail
+            try:
+                value = float(value)
+            except ValueError:
+                continue
 
             # start off the metadata if this is the first row of values
             if is_first_value_row:
@@ -322,7 +327,8 @@ def max_precision(nums):
 class ReverseReader:
     """Reads column-formatted files in reverse as lists of fields.
 
-        :param file_handle: (file) open file """
+        :param file_handle: (file) open file
+        :param delimiter: (string) ',' or 'whitespace' """
 
     def __init__(self, file_handle, delimiter=","):
         self.fh = file_handle
@@ -333,7 +339,9 @@ class ReverseReader:
 
     @staticmethod
     def fields(line, delimiter):
-        return [field.strip() for field in line.split(delimiter) if delimiter != " " or field.strip() != ""]
+        # if space-delimited, do not keep whitespace fields, otherwise do
+        return [field.strip() for field in re.split("," if delimiter == "," else "\\s", line)
+                if delimiter != "whitespace" or delimiter == "whitespace" and field.strip() != ""]
 
     def next(self):
         line = ''
