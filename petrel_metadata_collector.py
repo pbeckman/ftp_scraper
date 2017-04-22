@@ -100,7 +100,7 @@ def delete_file(tc, local_path, file_name):
 
 
 def download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path):
-    # print("collecting metadata from {}".format(globus_path + file_name))
+    print("extracting metadata from {}".format(globus_path + file_name))
     download_file(tc, endpoint_id, globus_path, file_name, local_path)
 
     metadata = extract_metadata(file_name, local_path)
@@ -176,7 +176,7 @@ def classify_files(tc, endpoint_id, files, start_file_number, local_path, metada
             metadata_file.write(metadata+",")
             print(metadata)
         except Exception as e:
-            with open("errors.log", "a") as error_file:
+            with open(os.path.expanduser("~/Documents/paul/metadata/errors.log"), "a") as error_file:
                 error_file.write(
                     "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
 
