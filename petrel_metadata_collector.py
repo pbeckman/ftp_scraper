@@ -211,11 +211,13 @@ tc = get_globus_client()
 
 t0 = time.time()
 
-with open("/~/Documents/paul/metadata/pub8_list.txt", "r") as file_list:
-    with open("/~/Documents/paul/metadata/metadata.txt", "r") as metadata_file:
+with open(os.path.expanduser("~/Documents/paul/metadata/pub8_list.txt"), "r") as file_list:
+    with open(os.path.expanduser("~/Documents/paul/metadata/metadata.txt"), "r") as metadata_file:
         metadata_file.write('{"files":[')
         classify_files(tc, PETREL_ID, file_list.readlines(), 0,
-                       "/~/Documents/paul/metadata/", metadata_file, "/~/Documents/paul/metadata/restart.csv")
+                       "/~/Documents/paul/metadata/",
+                       metadata_file,
+                       os.path.expanduser("~/Documents/paul/metadata/restart.csv"))
         metadata_file.seek(-1, 1)
         metadata_file.write(']}')
 
