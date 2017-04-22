@@ -35,14 +35,14 @@ def display_metadata(file_name, path):
 
 def test_metadata_extraction():
     display_metadata("no_headers.csv", "test_files/")
-    # display_metadata("some_netcdf.nc", "test_files/")
-    # display_metadata("single_header.csv", "test_files/")
-    # display_metadata("readme.txt", "test_files/")
-    # display_metadata("multiple_headers.csv", "test_files/")
-    # display_metadata("single_header.txt", "test_files/")
-    # display_metadata("preamble.exc.csv", "test_files/")
-    # display_metadata("preamble.dat", "test_files/")
-    # display_metadata("preamble.c32", "test_files/")
+    display_metadata("some_netcdf.nc", "test_files/")
+    display_metadata("single_header.csv", "test_files/")
+    display_metadata("readme.txt", "test_files/")
+    display_metadata("multiple_headers.csv", "test_files/")
+    display_metadata("single_header.txt", "test_files/")
+    display_metadata("preamble.exc.csv", "test_files/")
+    display_metadata("preamble.dat", "test_files/")
+    display_metadata("preamble.c32", "test_files/")
 
 
 def write_agg_csv(agg_writer, agg):

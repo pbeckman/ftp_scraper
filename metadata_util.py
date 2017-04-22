@@ -13,11 +13,16 @@ class ExtractionError(Exception):
     """Basic error to throw when an extractor fails"""
 
 
-def extract_metadata(file_name, path):
+class ExtractionPassed(Exception):
+    """Indicator to throw when extractor passes for fast file classification"""
+
+
+def extract_metadata(file_name, path, classification_only=False):
     """Create metadata JSON from file.
 
         :param file_name: (str) file name
         :param path: (str) absolute or relative path to file
+        :param classification_only: (bool) whether to exit after ascertaining file class
         :returns: (dict) metadata dictionary"""
 
     with open(path + file_name, 'rU') as file_handle:
@@ -38,35 +43,43 @@ def extract_metadata(file_name, path):
 
         if extension == "nc":
             try:
-                metadata.update(extract_netcdf_metadata(file_handle))
-                metadata["system"]["class"] = "container-format"
+                metadata.update(extract_netcdf_metadata(file_handle, classification_only=classification_only))
+                metadata["class"] = "container-format"
+            except ExtractionPassed:
+                metadata["class"] = "container-format"
             except ExtractionError:
                 # not a netCDF file
                 pass
         else:
             try:
-                metadata.update(extract_columnar_metadata(file_handle))
-                metadata["system"]["class"] = "columnar"
+                metadata.update(extract_columnar_metadata(file_handle, classification_only=classification_only))
+                metadata["class"] = "columnar"
+            except ExtractionPassed:
+                metadata["class"] = "columnar"
             except ExtractionError:
                 # not a columnar file
                 # check if this file is a usable abstract-like file
                 if is_abstract(file_handle):
-                    metadata["system"]["class"] = "free-text"
+                    metadata["class"] = "free-text"
                 pass
 
     return metadata
 
 
-def extract_netcdf_metadata(file_handle):
+def extract_netcdf_metadata(file_handle, classification_only=False):
     """Create netcdf metadata JSON from file.
 
         :param file_handle: (str) file
+        :param classification_only: (bool) whether to exit after ascertaining file class
         :returns: (dict) metadata dictionary"""
 
     try:
         dataset = Dataset(os.path.realpath(file_handle.name))
     except IOError:
         raise ExtractionError
+
+    if classification_only:
+        raise ExtractionPassed
 
     metadata = {
         "file_format": dataset.file_format,
@@ -133,10 +146,12 @@ class NumpyDecoder(json.JSONEncoder):
             return super(NumpyDecoder, self).default(obj)
 
 
-def extract_columnar_metadata(file_handle):
+def extract_columnar_metadata(file_handle, classification_only=False, min_classification_rows=10):
     """Get metadata from column-formatted file.
 
         :param file_handle: (file) open file
+        :param classification_only: (bool) whether to exit after ascertaining file class
+        :param min_classification_rows: (int) number of rows necessary to classify file as columnar
         :returns: (dict) ascertained metadata
         :raises: (ExtractionError) if the file cannot be read as a columnar file"""
 
@@ -156,7 +171,7 @@ def extract_columnar_metadata(file_handle):
     headers = []
     col_types = []
     col_aliases = []
-    num_value_rows = 0
+    num_rows = 0
     # used to check if all rows are the same length, if not, this is not a valid columnar file
     row_length = 0
     is_first_row = True
@@ -170,7 +185,7 @@ def extract_columnar_metadata(file_handle):
         # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
         if not is_first_row and row_length != len(row):
             # tables are not worth extracting if under this row threshold
-            if num_value_rows < min_rows:
+            if num_rows < min_rows:
                 raise ExtractionError
             else:
                 fully_parsed = False
@@ -181,12 +196,14 @@ def extract_columnar_metadata(file_handle):
         if is_first_row:
             # make column aliases so that we can create aggregates even for unlabelled columns
             col_aliases = ["__{}__".format(i) for i in range(0, row_length)]
+            # type check the first row to decide which aggregates to use
+            col_types = ["num" if is_number(field) else "str" for field in row]
             is_first_row = False
 
         # if the row is a header row, add all its fields to the headers list
         if is_header_row(row):
             # tables are likely not representative of the file if under this row threshold, so so not extract metadata
-            if num_value_rows < min_rows:
+            if num_rows < min_rows:
                 raise ExtractionError
             # set the column aliases to the most recent header row if they are unique
             if len(set(row)) == len(row):
@@ -199,18 +216,16 @@ def extract_columnar_metadata(file_handle):
                     headers.append(header)
 
         else:
-            num_value_rows += 1
+            num_rows += 1
+            add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
 
-            # type check the first row to decide which aggregates to use
-            if num_value_rows == 1:
-                col_types = ["num" if is_number(field) else "str" for field in row]
-
-            add_row_to_aggregates(metadata, row, col_aliases, col_types, num_value_rows == 1)
+        if classification_only and num_rows > min_classification_rows:
+            raise ExtractionPassed
 
     # add the originally skipped rows into the aggregates
     for row in last_rows:
         if len(row) == row_length:
-            add_row_to_aggregates(metadata, row, col_aliases, col_types, num_value_rows == 1)
+            add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
 
     # number of characters in file before last un-parse-able row
     if not fully_parsed:
@@ -234,7 +249,7 @@ def extract_columnar_metadata(file_handle):
     if len(headers) > 0:
         metadata["headers"] = list(set(headers))
 
-    add_final_aggregates(metadata, col_aliases, col_types, num_value_rows)
+    add_final_aggregates(metadata, col_aliases, col_types, num_rows)
 
     return metadata
 
@@ -306,13 +321,13 @@ def add_row_to_aggregates(metadata, row, col_aliases, col_types, is_first_value_
             pass
 
 
-def add_final_aggregates(metadata, col_aliases, col_types, num_value_rows):
+def add_final_aggregates(metadata, col_aliases, col_types, num_rows):
     """Adds row data to aggregates.
 
         :param metadata: (dict) metadata dictionary to add to
         :param col_aliases: (list(str)) list of headers
         :param col_types: (list("num" | "str")) list of header types
-        :param num_value_rows: (int) number of value rows"""
+        :param num_rows: (int) number of value rows"""
 
     # calculate averages for numerical columns if aggregates were taken,
     # (which only happens when there is a single row of headers)
@@ -329,7 +344,7 @@ def add_final_aggregates(metadata, col_aliases, col_types, num_value_rows):
                                                      if val != float("inf")]
 
             metadata["columns"][col_alias]["avg"] = round(
-                metadata["columns"][col_alias]["total"] / num_value_rows,
+                metadata["columns"][col_alias]["total"] / num_rows,
                 max_precision([metadata["columns"][col_alias]["min"][0], metadata["columns"][col_alias]["max"][0]])
             ) if len(metadata["columns"][col_alias]["min"]) > 0 else None
             metadata["columns"][col_alias].pop("total")

@@ -99,6 +99,20 @@ def delete_file(tc, local_path, file_name):
     tc.submit_delete(ddata)
 
 
+def download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path):
+    # print("collecting metadata from {}".format(globus_path + file_name))
+    download_file(tc, endpoint_id, globus_path, file_name, local_path)
+
+    metadata = extract_metadata(file_name, local_path)
+
+    # overwrite the recorded local path with the globus path
+    metadata["system"]["path"] = globus_path
+
+    delete_file(tc, local_path, file_name)
+
+    return metadata
+
+
 def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_writer, restart_file):
     for file_number in range(start_file_number, len(files)):
         full_file_name = files[file_number]
@@ -123,22 +137,6 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
                 with open("errors.log", "a") as error_file:
                     error_file.write(
                         "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
-
-        restart_file.write("{},{}".format(file_number, full_file_name))
-
-
-def download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path):
-    # print("collecting metadata from {}".format(globus_path + file_name))
-    download_file(tc, endpoint_id, globus_path, file_name, local_path)
-
-    metadata = extract_metadata(file_name, local_path)
-
-    # overwrite the recorded local path with the globus path
-    metadata["system"]["path"] = globus_path
-
-    delete_file(tc, local_path, file_name)
-
-    return metadata
 
 
 def write_dict_to_csv(metadata, csv_writer):
@@ -167,6 +165,25 @@ def write_dict_to_csv(metadata, csv_writer):
         ])
 
 
+def classify_files(tc, endpoint_id, files, start_file_number, local_path, metadata_file, restart):
+    for file_number in range(start_file_number, len(files)):
+        full_file_name = files[file_number]
+        globus_path, file_name = full_file_name.strip().rsplit("/", 1)
+        globus_path += "/"
+
+        try:
+            metadata = download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path)
+            metadata_file.write(metadata+",")
+            print(metadata)
+        except Exception as e:
+            with open("errors.log", "a") as error_file:
+                error_file.write(
+                    "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
+
+        with open(restart, "w") as restart_file:
+            restart_file.write("{},{}".format(file_number, full_file_name))
+
+
 # get client
 tc = get_globus_client()
 
@@ -179,24 +196,28 @@ tc = get_globus_client()
 # with open("pub8_list.txt", "w") as f:
 #     write_file_list(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/", f)
 
-# download_file(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt")
+# csv_writer = csv.writer(open("col_metadata.csv", "a"))
+# csv_writer.writerow([
+#     "path", "file", "column",
+#     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
+#     "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
+#     "avg", "mode",
+#     "null"
+# ])
 
-# print(extract_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
+# with open("pub8_list.txt", "r") as file_list:
+#     with open("restart.txt", "a") as restart_file:
+#         write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", csv_writer, restart_file)
 
 t0 = time.time()
 
-csv_writer = csv.writer(open("col_metadata.csv", "a"))
-csv_writer.writerow([
-    "path", "file", "column",
-    "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
-    "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
-    "avg", "mode",
-    "null"
-])
-
 with open("pub8_list.txt", "r") as file_list:
-    with open("restart.txt", "a") as restart_file:
-        write_metadata(tc, PETREL_ID, file_list.readlines(), 0, "/home/paul/", csv_writer, restart_file)
+    with open("metadata.txt", "r") as metadata_file:
+        metadata_file.write('{"files":[')
+        classify_files(tc, PETREL_ID, file_list.readlines(), 0,
+                       "/~/Documents/paul/metadata/", metadata_file, "/~/Documents/paul/metadata/restart.csv")
+        metadata_file.seek(-1, 1)
+        metadata_file.write(']}')
 
 t1 = time.time()
 
