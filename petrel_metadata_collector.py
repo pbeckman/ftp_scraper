@@ -6,7 +6,7 @@ import traceback
 import globus_sdk
 from hashlib import sha256
 from re import compile
-from metadata_util import get_metadata
+from metadata_util import extract_metadata
 
 # pattern used to distinguish files from directories - has '.' in 2nd, 3rd, or 4th to last character
 file_pattern = compile("^.*\..{2,4}$")
@@ -15,8 +15,10 @@ PETREL_ID = os.environ["PETREL_ID"]
 LOCAL_ID = os.environ["LOCAL_ID"]
 TRANSFER_TOKEN = os.environ["TRANSFER_TOKEN"]
 
+
 def globus_first_login():
-    # This method should only have to be run once EVER per user to get refresh token environment variable
+    # This method should only ~hypothetically~ have to be run once EVER per user
+    # to get refresh token environment variable
 
     # create a client object that tracks state as we do this flow
     client = globus_sdk.NativeAppAuthClient(LOCAL_ID)
@@ -94,10 +96,7 @@ def delete_file(tc, local_path, file_name):
 
     ddata.add_item(local_path + file_name)
 
-    # # Ensure endpoint is activated
-    # tc.endpoint_autoactivate(endpoint_id)
-
-    result = tc.submit_delete(ddata)
+    tc.submit_delete(ddata)
 
 
 def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_writer, restart_file):
@@ -106,61 +105,48 @@ def write_metadata(tc, endpoint_id, files, start_file_number, local_path, csv_wr
         globus_path, file_name = full_file_name.strip().rsplit("/", 1)
         globus_path += "/"
 
-        extension = file_name.split('.', 1)[1].strip() if '.' in file_name else "no extension"
-        # for null value collection only process these 3 types
-        if extension in ["csv", "txt", "dat"]:
+        metadata = {}
+        try:
+            metadata = download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path)
+        except Exception as e:
+            with open("errors.log", "a") as error_file:
+                error_file.write(
+                    "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
 
-            metadata = {}
+        # write metadata to file if there are aggregates
+        if "columns" in metadata.keys():
+            # print("writing to col_metadata.csv:")
+            # print(metadata)
             try:
-                metadata = get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path)
+                write_dict_to_csv(metadata, csv_writer)
             except Exception as e:
                 with open("errors.log", "a") as error_file:
-                    error_file.write("{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
-
-            # write metadata to file if there are aggregates
-            if "content_metadata" in metadata.keys() and len(metadata["content_metadata"].keys()) > 1:
-                # print("writing to col_metadata.csv:")
-                # print(metadata)
-                try:
-                    write_dict_to_csv(metadata, csv_writer)
-                except Exception as e:
-                    with open("errors.log", "a") as error_file:
-                        error_file.write(
-                            "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
+                    error_file.write(
+                        "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
 
         restart_file.write("{},{}".format(file_number, full_file_name))
 
 
-def get_file_metadata(tc, endpoint_id, globus_path, file_name, local_path):
+def download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path):
     # print("collecting metadata from {}".format(globus_path + file_name))
     download_file(tc, endpoint_id, globus_path, file_name, local_path)
-    local_path_to_file = local_path + file_name
 
-    extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
-    metadata = {
-        "file": file_name,
-        "path": globus_path,
-        "type": extension,
-        "size": os.path.getsize(local_path_to_file)
-    }
+    metadata = extract_metadata(file_name, local_path)
 
-    content_metadata = get_metadata(file_name, local_path)
+    # overwrite the recorded local path with the globus path
+    metadata["system"]["path"] = globus_path
 
     delete_file(tc, local_path, file_name)
-
-    if content_metadata != {}:
-        metadata["content_metadata"] = content_metadata
 
     return metadata
 
 
 def write_dict_to_csv(metadata, csv_writer):
-    cols = metadata["content_metadata"].keys()
-    cols.remove("headers")
+    cols = metadata["columns"].keys()
     for col in cols:
-        col_agg = metadata["content_metadata"][col]
+        col_agg = metadata["columns"][col]
         csv_writer.writerow([
-            metadata["path"], metadata["file"], col,
+            metadata["system"]["path"], metadata["system"]["file"], col,
 
             col_agg["min"][0] if "min" in col_agg.keys() and len(col_agg["min"]) > 0 else None,
             col_agg["min"][1] - col_agg["min"][0] if "min" in col_agg.keys() and len(col_agg["min"]) > 1 else None,
@@ -177,8 +163,9 @@ def write_dict_to_csv(metadata, csv_writer):
             col_agg["avg"] if "avg" in col_agg.keys() else None,
             col_agg["mode"] if "mode" in col_agg.keys() else None,
 
-            None, None, None  # spaces for null values to be recorded by hand
+            None  # space for null values to be recorded by hand
         ])
+
 
 # get client
 tc = get_globus_client()
@@ -194,7 +181,7 @@ tc = get_globus_client()
 
 # download_file(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt")
 
-# print(get_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
+# print(extract_file_metadata(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/oceans/AMT_data/", "AMT1.txt", "/home/paul/"))
 
 t0 = time.time()
 
@@ -204,7 +191,7 @@ csv_writer.writerow([
     "min_1", "min_diff_1", "min_2", "min_diff_1", "min_3",
     "max_1", "max_diff_1", "max_2", "max_diff_1", "max_3",
     "avg", "mode",
-    "null_1", "null_2", "null_3"
+    "null"
 ])
 
 with open("pub8_list.txt", "r") as file_list:
@@ -213,6 +200,4 @@ with open("pub8_list.txt", "r") as file_list:
 
 t1 = time.time()
 
-print("time taken: {}".format(str(t1-t0)))
-# metadata = get_metadata("single_header.csv", "test_files/")
-# write_dict_to_csv(metadata, csv_writer)
+print("time taken: {}".format(str(t1 - t0)))

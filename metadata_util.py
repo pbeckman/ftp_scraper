@@ -6,10 +6,7 @@ import re
 from netCDF4 import Dataset
 from decimal import Decimal
 from operator import itemgetter
-
-
-# TODO: bounding box method for lat and lon lists?
-# TODO: granularity of data?
+from hashlib import sha256
 
 
 class ExtractionError(Exception):
@@ -26,17 +23,36 @@ def extract_metadata(file_name, path):
     with open(path + file_name, 'rU') as file_handle:
 
         extension = file_name.split('.', 1)[1] if '.' in file_name else "no extension"
-
-        metadata = {}
-
-        try:
-            metadata = extract_columnar_metadata(file_handle)
-        except ExtractionError:
-            # not a columnar file
-            pass
+        metadata = {
+            "system": {
+                "file": file_name,
+                "path": path,
+                "extension": extension,
+                "size": os.path.getsize(path + file_name),
+                "checksum": sha256(file_handle.read()).hexdigest()
+            },
+            "class": "unknown"
+        }
+        # checksum puts cursor at end of file - reset to beginning for metadata extraction
+        file_handle.seek(0)
 
         if extension == "nc":
-            metadata = extract_netcdf_metadata(file_handle)
+            try:
+                metadata.update(extract_netcdf_metadata(file_handle))
+                metadata["system"]["class"] = "container-format"
+            except ExtractionError:
+                # not a netCDF file
+                pass
+        else:
+            try:
+                metadata.update(extract_columnar_metadata(file_handle))
+                metadata["system"]["class"] = "columnar"
+            except ExtractionError:
+                # not a columnar file
+                # check if this file is a usable abstract-like file
+                if is_abstract(file_handle):
+                    metadata["system"]["class"] = "free-text"
+                pass
 
     return metadata
 
@@ -47,7 +63,11 @@ def extract_netcdf_metadata(file_handle):
         :param file_handle: (str) file
         :returns: (dict) metadata dictionary"""
 
-    dataset = Dataset(os.path.realpath(file_handle.name))
+    try:
+        dataset = Dataset(os.path.realpath(file_handle.name))
+    except IOError:
+        raise ExtractionError
+
     metadata = {
         "file_format": dataset.file_format,
     }
@@ -137,7 +157,6 @@ def extract_columnar_metadata(file_handle):
     col_types = []
     col_aliases = []
     num_value_rows = 0
-    num_header_rows = 0
     # used to check if all rows are the same length, if not, this is not a valid columnar file
     row_length = 0
     is_first_row = True
@@ -162,7 +181,7 @@ def extract_columnar_metadata(file_handle):
         if is_first_row:
             # make column aliases so that we can create aggregates even for unlabelled columns
             col_aliases = ["__{}__".format(i) for i in range(0, row_length)]
-        is_first_row = False
+            is_first_row = False
 
         # if the row is a header row, add all its fields to the headers list
         if is_header_row(row):
@@ -175,7 +194,6 @@ def extract_columnar_metadata(file_handle):
                     metadata["columns"][row[i]] = metadata["columns"].pop(col_aliases[i])
                 col_aliases = row
 
-            num_header_rows += 1
             for header in row:
                 if header != "":
                     headers.append(header)
@@ -204,7 +222,8 @@ def extract_columnar_metadata(file_handle):
         else:
             file_handle.seek(0)
         preamble = ""
-        # do this instead of passing an argument to read() to avoid multi-byte character encoding difficulties
+        # do this instead of passing a numerical length argument to read()
+        # in order to avoid multi-byte character encoding difficulties
         while file_handle.tell() <= reverse_reader.prev_position:
             preamble += file_handle.read(1)
         # add preamble to the metadata if the whole file hasn't already been processed
@@ -388,3 +407,31 @@ def is_number(field):
         return True
     except ValueError:
         return False
+
+
+def is_abstract(file_handle):
+    """Determine if a file is a free-text abstract-like file that can be fed to the topic model.
+
+        :param file_handle: (file) open file object
+        :returns: (bool) whether file should be topic modeled"""
+
+    # TODO: test heuristic min_size and sample_size, right now full file used as sample
+
+    # minimum length in bytes to be usable as an abstract
+    min_length = 1000
+    # number of bytes used to establish numerical vs. alphabetic proportion of file
+    sample_length = 1000
+    # maximum percentage numerical characters to be a valid abstract-like file
+    max_num = 0.1
+
+    # read in a portion of the file
+    file_handle.seek(0)
+    sample = file_handle.read()
+    # since the cursor is now at the end of the file, telling gives the file length
+    length = file_handle.tell()
+
+    if length > min_length and float(len(re.sub("[^0-9]", "", sample)))/len(sample) < max_num:
+        return True
+    else:
+        return False
+
