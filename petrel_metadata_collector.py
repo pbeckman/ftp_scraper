@@ -79,7 +79,7 @@ def write_file_list(tc, endpoint_id, globus_path, list_file):
 
 
 def download_file(tc, endpoint_id, globus_path, file_name, local_path):
-    # print("downloading file {}".format(globus_path + file_name))
+    print("downloading file {}".format(globus_path + file_name))
     tdata = globus_sdk.TransferData(tc, endpoint_id, LOCAL_ID)
     tdata.add_item(globus_path + file_name, local_path + file_name)
 
@@ -100,9 +100,10 @@ def delete_file(tc, local_path, file_name):
 
 
 def download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path):
-    print("extracting metadata from {}".format(globus_path + file_name))
+
     download_file(tc, endpoint_id, globus_path, file_name, local_path)
 
+    print("extracting metadata from {}".format(globus_path + file_name))
     metadata = extract_metadata(file_name, local_path)
 
     # overwrite the recorded local path with the globus path
@@ -187,12 +188,11 @@ def classify_files(tc, endpoint_id, files, start_file_number, local_path, metada
 # get client
 tc = get_globus_client()
 
-# activate local endpoint
-tc.endpoint_autoactivate(LOCAL_ID)
-
 # # activate Petrel endpoint
 # tc.endpoint_autoactivate(PETREL_ID)
 #
+# # activate local endpoint
+# tc.endpoint_autoactivate(LOCAL_ID)
 
 # with open("pub8_list.txt", "w") as f:
 #     write_file_list(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/", f)
@@ -216,7 +216,7 @@ with open(os.path.expanduser("~/Documents/paul/metadata/pub8_list.txt"), "r") as
     with open(os.path.expanduser("~/Documents/paul/metadata/metadata.txt"), "w") as metadata_file:
         metadata_file.write('{"files":[')
         classify_files(tc, PETREL_ID, file_list.readlines(), 0,
-                       "/~/Documents/paul/metadata/",
+                       os.path.expanduser("~/Documents/paul/metadata/"),
                        metadata_file,
                        os.path.expanduser("~/Documents/paul/metadata/restart.csv"))
         metadata_file.seek(-1, 1)
