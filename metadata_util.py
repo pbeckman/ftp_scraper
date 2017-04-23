@@ -220,6 +220,8 @@ def extract_columnar_metadata(file_handle, classification_only=False, min_classi
             add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
 
         if classification_only and num_rows > min_classification_rows:
+            for key in set(metadata.keys())-set(["system", "class"]):
+                metadata.pop(key)
             raise ExtractionPassed
 
     # add the originally skipped rows into the aggregates
