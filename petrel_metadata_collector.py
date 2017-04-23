@@ -187,11 +187,12 @@ def classify_files(tc, endpoint_id, files, start_file_number, local_path, metada
 # get client
 tc = get_globus_client()
 
+# activate local endpoint
+tc.endpoint_autoactivate(LOCAL_ID)
+
 # # activate Petrel endpoint
 # tc.endpoint_autoactivate(PETREL_ID)
 #
-# # activate local endpoint
-# tc.endpoint_autoactivate(LOCAL_ID)
 
 # with open("pub8_list.txt", "w") as f:
 #     write_file_list(tc, PETREL_ID, "/cdiac/cdiac.ornl.gov/pub8/", f)
