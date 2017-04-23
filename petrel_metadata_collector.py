@@ -2,6 +2,7 @@ from __future__ import print_function
 import os
 import time
 import csv
+import json
 import traceback
 import globus_sdk
 from hashlib import sha256
@@ -174,7 +175,7 @@ def classify_files(tc, endpoint_id, files, start_file_number, local_path, metada
 
         try:
             metadata = download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path)
-            metadata_file.write(metadata+",")
+            metadata_file.write(json.dumps(metadata)+",")
             print(metadata)
         except Exception as e:
             with open(os.path.expanduser("~/Documents/paul/metadata/errors.log"), "a") as error_file:
