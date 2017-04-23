@@ -215,8 +215,8 @@ t0 = time.time()
 
 with open(os.path.expanduser("~/Documents/paul/metadata/pub8_list.txt"), "r") as file_list:
     with open(os.path.expanduser("~/Documents/paul/metadata/metadata.txt"), "w") as metadata_file:
-        metadata_file.write('{"files":[')
-        classify_files(tc, PETREL_ID, file_list.readlines(), 0,
+        # metadata_file.write('{"files":[')
+        classify_files(tc, PETREL_ID, file_list.readlines(), 1011,
                        os.path.expanduser("~/Documents/paul/metadata/download/"),
                        metadata_file,
                        os.path.expanduser("~/Documents/paul/metadata/restart.csv"))

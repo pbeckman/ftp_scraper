@@ -220,8 +220,9 @@ def extract_columnar_metadata(file_handle, classification_only=False, min_classi
             add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
 
         if classification_only and num_rows > min_classification_rows:
-            for key in set(metadata.keys())-set(["system", "class"]):
-                metadata.pop(key)
+            for key in metadata.keys():
+                if key not in ["system", "class"]:
+                    metadata.pop(key)
             raise ExtractionPassed
 
     # add the originally skipped rows into the aggregates
@@ -282,7 +283,7 @@ def add_row_to_aggregates(metadata, row, col_aliases, col_types, is_first_value_
 
         if col_type == "num":
             # cast the field to a number to do numerical aggregates
-            # the try except is used to pass over textual and black space nulls on which type coercion will fail
+            # the try except is used to pass over textual and blank space nulls on which type coercion will fail
             try:
                 value = float(value)
             except ValueError:
@@ -382,7 +383,7 @@ class ReverseReader:
     def next(self):
         line = ''
         if self.position <= 0:
-            raise StopIteration
+            raise StopIteration()
         self.prev_position = self.position
         while self.position >= 0:
             self.fh.seek(self.position)
