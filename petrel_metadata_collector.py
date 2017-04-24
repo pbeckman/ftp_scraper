@@ -177,7 +177,7 @@ def classify_files(tc, endpoint_id, files, start_file_number, local_path, metada
             metadata = download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path)
             metadata_file.write(json.dumps(metadata)+",")
             print(metadata)
-        except UnicodeDecodeError as e:
+        except (UnicodeDecodeError, MemoryError) as e:
             with open(os.path.expanduser("~/Documents/paul/metadata/errors.log"), "a") as error_file:
                 error_file.write(
                     "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
@@ -214,9 +214,9 @@ tc = get_globus_client()
 t0 = time.time()
 
 with open(os.path.expanduser("~/Documents/paul/metadata/pub8_list.txt"), "r") as file_list:
-    with open(os.path.expanduser("~/Documents/paul/metadata/metadata.txt"), "w") as metadata_file:
+    with open(os.path.expanduser("~/Documents/paul/metadata/metadata.txt"), "a") as metadata_file:
         # metadata_file.write('{"files":[')
-        classify_files(tc, PETREL_ID, file_list.readlines(), 0,
+        classify_files(tc, PETREL_ID, file_list.readlines(), 5160,
                        os.path.expanduser("~/Documents/paul/metadata/download/"),
                        metadata_file,
                        os.path.expanduser("~/Documents/paul/metadata/restart.csv"))

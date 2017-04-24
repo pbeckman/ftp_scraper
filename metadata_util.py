@@ -59,9 +59,12 @@ def extract_metadata(file_name, path, classification_only=False):
             except ExtractionError:
                 # not a columnar file
                 # check if this file is a usable abstract-like file
-                if is_abstract(file_handle):
+                if metadata["system"]["size"] > 1000 and is_abstract(file_handle):
                     metadata["class"] = "free-text"
-                pass
+
+    for key in metadata.keys():
+        if key not in ["system", "class"]:
+            metadata.pop(key)
 
     return metadata
 
@@ -225,9 +228,6 @@ def extract_columnar_metadata(file_handle, classification_only=False, min_classi
             add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
 
         if classification_only and num_rows > min_classification_rows:
-            for key in metadata.keys():
-                if key not in ["system", "class"]:
-                    metadata.pop(key)
             raise ExtractionPassed
 
     # add the originally skipped rows into the aggregates
@@ -438,7 +438,7 @@ def is_abstract(file_handle):
         :param file_handle: (file) open file object
         :returns: (bool) whether file should be topic modeled"""
 
-    # TODO: test heuristic min_size and sample_size, right now full file used as sample
+    # TODO: test heuristic min_size and sample_size
 
     # minimum length in bytes to be usable as an abstract
     min_length = 1000
@@ -449,11 +449,11 @@ def is_abstract(file_handle):
 
     # read in a portion of the file
     file_handle.seek(0)
-    sample = file_handle.read()
+    sample = file_handle.read(sample_length)
     # since the cursor is now at the end of the file, telling gives the file length
     length = file_handle.tell()
 
-    if length > min_length and float(len(re.sub("[^0-9]", "", sample))) / len(sample) < max_num:
+    if float(len(re.sub("[^0-9]", "", sample))) / len(sample) < max_num:
         return True
     else:
         return False
