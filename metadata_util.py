@@ -180,9 +180,9 @@ def extract_columnar_metadata(file_handle, classification_only=False, min_classi
     # save the last l rows to try to parse them later
     last_rows = [reverse_reader.next() for i in range(0, 3)]
 
-    # now we try to extract a table from the remaining n-l rows
-    for row in reverse_reader:
-        try:
+    try:
+        # now we try to extract a table from the remaining n-l rows
+        for row in reverse_reader:
             # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
             if not is_first_row and row_length != len(row):
                 # tables are not worth extracting if under this row threshold
@@ -226,8 +226,8 @@ def extract_columnar_metadata(file_handle, classification_only=False, min_classi
                         metadata.pop(key)
                 raise ExtractionPassed
 
-        except StopIteration:
-            pass
+    except StopIteration:
+        pass
 
     # add the originally skipped rows into the aggregates
     for row in last_rows:
@@ -387,7 +387,7 @@ class ReverseReader:
     def next(self):
         line = ''
         if self.position <= 0:
-            raise StopIteration()
+            raise StopIteration
         self.prev_position = self.position
         while self.position >= 0:
             self.fh.seek(self.position)
