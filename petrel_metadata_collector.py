@@ -177,7 +177,7 @@ def classify_files(tc, endpoint_id, files, start_file_number, local_path, metada
             metadata = download_extract_delete(tc, endpoint_id, globus_path, file_name, local_path)
             metadata_file.write(json.dumps(metadata)+",")
             print(metadata)
-        except (UnicodeDecodeError, MemoryError) as e:
+        except (UnicodeDecodeError, MemoryError, TypeError) as e:
             with open(os.path.expanduser("~/Documents/paul/metadata/errors.log"), "a") as error_file:
                 error_file.write(
                     "{}{} :: {}\n{}\n\n".format(globus_path, file_name, str(e), traceback.format_exc()))
