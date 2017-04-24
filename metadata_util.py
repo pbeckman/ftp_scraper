@@ -178,56 +178,57 @@ def extract_columnar_metadata(file_handle, classification_only=False, min_classi
     fully_parsed = True
 
     # save the last l rows to try to parse them later
-    last_rows = [reverse_reader.next() for i in range(0, 3)]
-
+    # if there are less than l rows, you must catch the StopIteration exception
+    last_rows = []
     try:
-        # now we try to extract a table from the remaining n-l rows
-        for row in reverse_reader:
-            # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
-            if not is_first_row and row_length != len(row):
-                # tables are not worth extracting if under this row threshold
-                if num_rows < min_rows:
-                    raise ExtractionError
-                else:
-                    fully_parsed = False
-                    break
-            # update row length for next check
-            row_length = len(row)
-
-            if is_first_row:
-                # make column aliases so that we can create aggregates even for unlabelled columns
-                col_aliases = ["__{}__".format(i) for i in range(0, row_length)]
-                # type check the first row to decide which aggregates to use
-                col_types = ["num" if is_number(field) else "str" for field in row]
-                is_first_row = False
-
-            # if the row is a header row, add all its fields to the headers list
-            if is_header_row(row):
-                # tables are likely not representative of the file if under this row threshold, don't extract metadata
-                if num_rows < min_rows:
-                    raise ExtractionError
-                # set the column aliases to the most recent header row if they are unique
-                if len(set(row)) == len(row):
-                    for i in range(0, len(row)):
-                        metadata["columns"][row[i]] = metadata["columns"].pop(col_aliases[i])
-                    col_aliases = row
-
-                for header in row:
-                    if header != "":
-                        headers.append(header)
-
-            else:
-                num_rows += 1
-                add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
-
-            if classification_only and num_rows > min_classification_rows:
-                for key in metadata.keys():
-                    if key not in ["system", "class"]:
-                        metadata.pop(key)
-                raise ExtractionPassed
-
+        last_rows = [reverse_reader.next() for i in range(0, 3)]
     except StopIteration:
         pass
+
+    # now we try to extract a table from the remaining n-l rows
+    for row in reverse_reader:
+        # if row is not the same length as previous row, raise an error showing this is not a valid columnar file
+        if not is_first_row and row_length != len(row):
+            # tables are not worth extracting if under this row threshold
+            if num_rows < min_rows:
+                raise ExtractionError
+            else:
+                fully_parsed = False
+                break
+        # update row length for next check
+        row_length = len(row)
+
+        if is_first_row:
+            # make column aliases so that we can create aggregates even for unlabelled columns
+            col_aliases = ["__{}__".format(i) for i in range(0, row_length)]
+            # type check the first row to decide which aggregates to use
+            col_types = ["num" if is_number(field) else "str" for field in row]
+            is_first_row = False
+
+        # if the row is a header row, add all its fields to the headers list
+        if is_header_row(row):
+            # tables are likely not representative of the file if under this row threshold, don't extract metadata
+            if num_rows < min_rows:
+                raise ExtractionError
+            # set the column aliases to the most recent header row if they are unique
+            if len(set(row)) == len(row):
+                for i in range(0, len(row)):
+                    metadata["columns"][row[i]] = metadata["columns"].pop(col_aliases[i])
+                col_aliases = row
+
+            for header in row:
+                if header != "":
+                    headers.append(header)
+
+        else:
+            num_rows += 1
+            add_row_to_aggregates(metadata, row, col_aliases, col_types, num_rows == 1)
+
+        if classification_only and num_rows > min_classification_rows:
+            for key in metadata.keys():
+                if key not in ["system", "class"]:
+                    metadata.pop(key)
+            raise ExtractionPassed
 
     # add the originally skipped rows into the aggregates
     for row in last_rows:
@@ -452,8 +453,7 @@ def is_abstract(file_handle):
     # since the cursor is now at the end of the file, telling gives the file length
     length = file_handle.tell()
 
-    if length > min_length and float(len(re.sub("[^0-9]", "", sample)))/len(sample) < max_num:
+    if length > min_length and float(len(re.sub("[^0-9]", "", sample))) / len(sample) < max_num:
         return True
     else:
         return False
-
